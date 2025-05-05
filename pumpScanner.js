@@ -6,7 +6,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const connection = new Connection('https://api.mainnet-beta.solana.com');
+// RPC ESTABLE (evita error 410)
+const connection = new Connection('https://rpc-proxy.triton.one');
 const provider = new AnchorProvider(connection, {}, {});
 const programId = new PublicKey('PumPpTunA9D49qkZ2TBeCpYTxUN1UbkXHc3i7zALvN2');
 const program = new Program(idl, programId, provider);
