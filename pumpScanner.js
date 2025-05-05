@@ -1,12 +1,4 @@
 import fetch from "node-fetch";
-import dotenv from "dotenv";
-import TelegramBot from "node-telegram-bot-api";
-
-dotenv.config();
-
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const CHAT_ID = process.env.CHAT_ID;
-const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
 
 export async function escanearPumpFun() {
   console.log(`[${new Date().toLocaleTimeString()}] Escaneando en Pump.fun...`);
@@ -19,32 +11,23 @@ export async function escanearPumpFun() {
       const vol = t.volume || 0;
       const holders = t.holders || 0;
       const age = (Date.now() - new Date(t.created_at)) / 60000;
+      const price = t.price || 0;
+      const marketCap = price * 1_000_000_000;
 
       return (
-        lp >= 2000 &&
-        lp <= 75000 &&
+        lp >= 3000 && lp <= 75000 &&
         vol >= 15000 &&
         holders >= 50 &&
-        age <= 35
+        age <= 35 &&
+        marketCap >= 1000 && marketCap <= 15000
       );
     });
 
     if (joyas.length > 0) {
-      for (const t of joyas) {
-        console.log(`🟡 Pump.fun: ${t.name} (${t.symbol}) | LP: $${t.liquidity} | Vol: $${t.volume} | Holders: ${t.holders}`);
-
-        const mensaje = `
-🚀 *Joya Detectada en Pump.fun*  
-*Nombre:* ${t.name}  
-*Símbolo:* ${t.symbol}  
-*LP:* $${t.liquidity}  
-*Volumen:* $${t.volume}  
-*Holders:* ${t.holders}  
-*Ver:* https://pump.fun/${t.symbol}
-        `.trim();
-
-        await bot.sendMessage(CHAT_ID, mensaje, { parse_mode: "Markdown" });
-      }
+      joyas.forEach((t) => {
+        const mc = (t.price * 1_000_000_000).toFixed(0);
+        console.log(`🟡 Pump.fun: ${t.name} (${t.symbol}) | LP: $${t.liquidity} | Vol: $${t.volume} | Holders: ${t.holders} | MC: $${mc}`);
+      });
     } else {
       console.log(`[${new Date().toLocaleTimeString()}] Sin joyas en Pump.fun.`);
     }
