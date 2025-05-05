@@ -1,15 +1,29 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Saldo de Wallet Solana</title>
 </head>
 <body>
   <h1>Saldo de tu Wallet</h1>
-  <form action="/" method="get">
-    <input type="text" name="wallet" placeholder="Ingresa tu wallet de Solana" required>
+  <form id="form">
+    <input type="text" id="wallet" name="wallet" placeholder="Ingresa tu wallet de Solana" />
     <button type="submit">Consultar</button>
   </form>
+  <p id="resultado"></p>
+
+  <script>
+    const form = document.getElementById('form');
+    const resultado = document.getElementById('resultado');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const wallet = document.getElementById('wallet').value;
+      const res = await fetch(`/?wallet=${wallet}`);
+      const text = await res.text();
+      resultado.innerText = text;
+    });
+  </script>
 </body>
 </html>
