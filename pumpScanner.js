@@ -1,11 +1,6 @@
 import fetch from "node-fetch";
-import TelegramBot from "node-telegram-bot-api";
-import dotenv from "dotenv";
-dotenv.config();
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN);
-
-export async function escanearPumpFun() {
+export async function escanearPumpFun(bot, chatId) {
   console.log(`[${new Date().toLocaleTimeString()}] Escaneando en Pump.fun...`);
   try {
     const res = await fetch("https://client-api-2-743b8b4ee2bf.herokuapp.com/api/tokens");
@@ -32,7 +27,7 @@ export async function escanearPumpFun() {
       joyas.forEach((t) => {
         const mensaje = `🟡 *Pump.fun Detected Gem*\n\n🪙 Token: *${t.name} (${t.symbol})*\n💧 LP: $${t.liquidity}\n📈 Vol: $${t.volume}\n👥 Holders: ${t.holders}\n⏱️ Edad: ${age.toFixed(1)} min\n💵 MC: $${mc}`;
         console.log(mensaje);
-        bot.sendMessage(process.env.CHAT_ID, mensaje, { parse_mode: "Markdown" });
+        bot.sendMessage(chatId, mensaje, { parse_mode: "Markdown" });
       });
     } else {
       console.log(`[${new Date().toLocaleTimeString()}] Sin joyas en Pump.fun.`);
