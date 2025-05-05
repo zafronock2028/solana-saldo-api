@@ -1,6 +1,11 @@
 import fetch from "node-fetch";
+import TelegramBot from "node-telegram-bot-api";
+import dotenv from "dotenv";
+dotenv.config();
 
-export async function escanearBirdeye(bot, CHAT_ID) {
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN);
+
+export const escanearBirdeye = async () => {
   console.log(`[${new Date().toLocaleTimeString()}] Escaneando en Birdeye...`);
   try {
     const res = await fetch("https://public-api.birdeye.so/defi/tokenlist?chain=solana");
@@ -11,36 +16,28 @@ export async function escanearBirdeye(bot, CHAT_ID) {
       const lp = t.liquidity || 0;
       const vol = t.volume_24h || 0;
       const age = t.age_minutes || 9999;
-      const mc = t.market_cap || 0;
+      const mc = t.market_cap_usd || 0;
 
       return (
-        lp >= 2500 &&
+        lp >= 3000 &&
         lp <= 75000 &&
-        vol >= 15000 &&
+        vol >= 18000 &&
         vol / lp >= 3 &&
-        mc <= 85000 &&
-        age <= 45
+        age <= 45 &&
+        mc >= 100000 && mc <= 1500000
       );
     });
 
     if (joyas.length > 0) {
-      for (const t of joyas) {
-        const msg = `
-🟢 *Birdeye: Joya Detectada*
-*Nombre:* ${t.name}
-*Símbolo:* ${t.symbol}
-*LP:* $${t.liquidity}
-*Volumen 24h:* $${t.volume_24h}
-*MarketCap:* $${t.market_cap}
-*Edad:* ${t.age_minutes} min
-*Ver:* https://birdeye.so/token/${t.address}?chain=solana
-        `.trim();
-        await bot.sendMessage(CHAT_ID, msg, { parse_mode: "Markdown" });
-      }
+      joyas.forEach((t) => {
+        const mensaje = `🟢 *Birdeye Detected Gem*\n\n🪙 Token: *${t.name} (${t.symbol})*\n💧 LP: $${t.liquidity}\n📈 Vol: $${t.volume_24h}\n⏱️ Edad: ${t.age_minutes} min\n💵 MC: $${t.market_cap_usd}`;
+        console.log(mensaje);
+        bot.sendMessage(process.env.CHAT_ID, mensaje, { parse_mode: "Markdown" });
+      });
     } else {
       console.log(`[${new Date().toLocaleTimeString()}] Sin joyas en Birdeye.`);
     }
   } catch (e) {
     console.error("Error escaneando Birdeye:", e.message);
   }
-}
+};
