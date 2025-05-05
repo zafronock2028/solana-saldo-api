@@ -1,12 +1,14 @@
-// birdeyeScanner.js
 import fetch from "node-fetch";
+import TelegramBot from "node-telegram-bot-api";
+import dotenv from "dotenv";
+dotenv.config();
 
-export async function escanearBirdeye(bot, chatId) {
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN);
+
+export const escanearBirdeye = async (bot, chatId) => {
+  console.log(`[${new Date().toLocaleTimeString()}] Escaneando en Birdeye...`);
   try {
-    console.log(`[${new Date().toLocaleTimeString()} PM] Escaneando en Birdeye...`);
-
-    const url = "https://public-api.birdeye.so/defi/tokenlist?chain=solana";
-    const res = await fetch(url);
+    const res = await fetch("https://public-api.birdeye.so/defi/tokenlist?chain=solana");
     const json = await res.json();
     const tokens = json?.data || [];
 
@@ -22,29 +24,20 @@ export async function escanearBirdeye(bot, chatId) {
         vol >= 18000 &&
         vol / lp >= 3 &&
         age <= 45 &&
-        mc >= 100000 &&
-        mc <= 1500000
+        mc >= 100000 && mc <= 1500000
       );
     });
 
-    if (joyas.length > 0) {
-      for (const t of joyas) {
-        const mensaje = `
-🟢 *Joya detectada en Birdeye*
+    for (const t of joyas) {
+      const mensaje = `🟢 *Birdeye Detected Gem*\n\n🪙 Token: *${t.name} (${t.symbol})*\n💧 LP: $${t.liquidity}\n📈 Vol: $${t.volume_24h}\n⏱️ Edad: ${t.age_minutes} min\n💵 MC: $${t.market_cap_usd}`;
+      console.log(mensaje);
+      await bot.sendMessage(chatId, mensaje, { parse_mode: "Markdown" });
+    }
 
-*Token:* ${t.name} (${t.symbol})
-*LP:* $${t.liquidity.toLocaleString()}
-*Volumen 24h:* $${t.volume_24h.toLocaleString()}
-*Edad:* ${t.age_minutes} minutos
-*Market Cap:* $${t.market_cap_usd.toLocaleString()}
-
-https://birdeye.so/token/${t.address}?chain=solana
-        `.trim();
-
-        await bot.sendMessage(chatId, mensaje, { parse_mode: "Markdown" });
-      }
+    if (joyas.length === 0) {
+      console.log(`[${new Date().toLocaleTimeString()}] Sin joyas en Birdeye.`);
     }
   } catch (e) {
     console.error("Error escaneando Birdeye:", e.message);
   }
-}
+};
