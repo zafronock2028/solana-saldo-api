@@ -16,7 +16,6 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 const WALLET = process.env.WALLET_ADDRESS;
 
-// === Servir el sitio web de consulta de saldo ===
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
@@ -119,36 +118,38 @@ async function buscarJoyas() {
   }
 }
 
-// === Comando /start sin restricción (temporal) ===
+// === Activador por /start ===
 bot.onText(/\/start/, (msg) => {
-  const id = msg.chat.id.toString();
-  console.log("Mensaje recibido de:", id); // Para confirmar que llega a tu bot
-  enviarMenu(id); // Enviar menú a cualquiera
+  console.log("Comando /start recibido");
+  if (msg.chat.id.toString() === CHAT_ID) {
+    enviarMenu(msg.chat.id);
+  } else {
+    bot.sendMessage(msg.chat.id, "Acceso denegado.");
+  }
 });
 
-// === Control desde Telegram ===
 bot.on("callback_query", async (query) => {
   const { data } = query;
-  const chatId = query.message.chat.id.toString();
+  if (query.message.chat.id.toString() !== CHAT_ID) return;
 
   if (data === "on") {
-    if (intervalo) return bot.sendMessage(chatId, "El bot ya está activo.");
+    if (intervalo) return bot.sendMessage(CHAT_ID, "El bot ya está activo.");
     guardarEstado({ activo: true });
     intervalo = setInterval(buscarJoyas, 60000);
     buscarJoyas();
-    bot.sendMessage(chatId, "ZafroBot está ENCENDIDO.");
+    bot.sendMessage(CHAT_ID, "ZafroBot está ENCENDIDO.");
   }
 
   if (data === "off") {
     guardarEstado({ activo: false });
     clearInterval(intervalo);
     intervalo = null;
-    bot.sendMessage(chatId, "ZafroBot está APAGADO.");
+    bot.sendMessage(CHAT_ID, "ZafroBot está APAGADO.");
   }
 
   if (data === "estado") {
     const estado = leerEstado().activo;
-    bot.sendMessage(chatId, `Estado actual: ${estado ? "✅ Encendido" : "⛔ Apagado"}`);
+    bot.sendMessage(CHAT_ID, `Estado actual: ${estado ? "✅ Encendido" : "⛔ Apagado"}`);
   }
 
   if (data === "saldo") {
@@ -165,18 +166,18 @@ bot.on("callback_query", async (query) => {
       });
       const json = await res.json();
       const sol = (json.result?.value || 0) / 10 ** 9;
-      bot.sendMessage(chatId, `Tu saldo actual es: ${sol.toFixed(4)} SOL`);
+      bot.sendMessage(CHAT_ID, `Tu saldo actual es: ${sol.toFixed(4)} SOL`);
     } catch (e) {
-      bot.sendMessage(chatId, "Error consultando saldo.");
+      bot.sendMessage(CHAT_ID, "Error consultando saldo.");
     }
   }
 
   if (data === "op") {
-    bot.sendMessage(chatId, "No hay operación activa.");
+    bot.sendMessage(CHAT_ID, "No hay operación activa.");
   }
 
   if (data === "historial") {
-    bot.sendMessage(chatId, "Historial vacío (aún no se guarda).");
+    bot.sendMessage(CHAT_ID, "Historial vacío (aún no se guarda).");
   }
 
   bot.answerCallbackQuery(query.id);
