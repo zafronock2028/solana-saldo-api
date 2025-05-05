@@ -1,11 +1,6 @@
 import fetch from "node-fetch";
-import TelegramBot from "node-telegram-bot-api";
-import dotenv from "dotenv";
-dotenv.config();
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN);
-
-export const escanearBirdeye = async () => {
+export const escanearBirdeye = async (bot, chatId) => {
   console.log(`[${new Date().toLocaleTimeString()}] Escaneando en Birdeye...`);
   try {
     const res = await fetch("https://public-api.birdeye.so/defi/tokenlist?chain=solana");
@@ -32,7 +27,7 @@ export const escanearBirdeye = async () => {
       joyas.forEach((t) => {
         const mensaje = `🟢 *Birdeye Detected Gem*\n\n🪙 Token: *${t.name} (${t.symbol})*\n💧 LP: $${t.liquidity}\n📈 Vol: $${t.volume_24h}\n⏱️ Edad: ${t.age_minutes} min\n💵 MC: $${t.market_cap_usd}`;
         console.log(mensaje);
-        bot.sendMessage(process.env.CHAT_ID, mensaje, { parse_mode: "Markdown" });
+        bot.sendMessage(chatId, mensaje, { parse_mode: "Markdown" });
       });
     } else {
       console.log(`[${new Date().toLocaleTimeString()}] Sin joyas en Birdeye.`);
