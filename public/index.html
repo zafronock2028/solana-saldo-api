@@ -8,7 +8,7 @@
 <body>
   <h1>Saldo de tu Wallet</h1>
   <form id="form">
-    <input type="text" id="wallet" name="wallet" placeholder="Ingresa tu wallet de Solana" />
+    <input type="text" id="wallet" placeholder="Ingresa tu wallet de Solana" />
     <button type="submit">Consultar</button>
   </form>
   <p id="resultado"></p>
@@ -20,7 +20,7 @@
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const wallet = document.getElementById('wallet').value;
-      const res = await fetch(`/?wallet=${wallet}`);
+      const res = await fetch(`/saldo?wallet=${wallet}`);
       const text = await res.text();
       resultado.innerText = text;
     });
