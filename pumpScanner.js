@@ -1,38 +1,42 @@
+// pumpScanner.js
 import fetch from "node-fetch";
+import TelegramBot from "node-telegram-bot-api";
+import dotenv from "dotenv";
+dotenv.config();
 
-export async function escanearPumpFun(bot, chatId) {
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN);
+
+const PUMP_FUN_PROXY = "https://client-api-2-743b8b4ee2bf.herokuapp.com/api/tokens";
+
+export async function escanearPumpFun() {
   console.log(`[${new Date().toLocaleTimeString()}] Escaneando en Pump.fun...`);
+
   try {
-    const res = await fetch("https://client-api-2-743b8b4ee2bf.herokuapp.com/api/tokens");
-    const tokens = await res.json();
+    const response = await fetch(PUMP_FUN_PROXY);
+    const tokens = await response.json();
 
-    const joyas = tokens.filter((t) => {
-      const lp = t.liquidity || 0;
-      const vol = t.volume || 0;
-      const holders = t.holders || 0;
-      const age = (Date.now() - new Date(t.created_at)) / 60000;
-      const mc = t.fully_diluted_market_cap || 0;
-
+    const joyas = tokens.filter((token) => {
+      const { liquidity, volume, holders, ageMinutes } = token;
       return (
-        lp >= 3000 &&
-        lp <= 75000 &&
-        vol >= 18000 &&
-        holders >= 60 &&
-        age <= 30 &&
-        mc >= 100000 && mc <= 1500000
+        liquidity > 2000 &&
+        liquidity < 75000 &&
+        volume > 15000 &&
+        holders > 50 &&
+        ageMinutes <= 35 &&
+        token.marketCap < 200000
       );
     });
 
     if (joyas.length > 0) {
-      joyas.forEach((t) => {
-        const mensaje = `🟡 *Pump.fun Detected Gem*\n\n🪙 Token: *${t.name} (${t.symbol})*\n💧 LP: $${t.liquidity}\n📈 Vol: $${t.volume}\n👥 Holders: ${t.holders}\n⏱️ Edad: ${age.toFixed(1)} min\n💵 MC: $${mc}`;
+      joyas.forEach((token) => {
+        const mensaje = `🔥 *Pump.fun Gem*\n\n🪙 Token: *${token.name}*\n💧 LP: $${token.liquidity.toLocaleString()}\n📊 Volumen: $${token.volume.toLocaleString()}\n🧑‍🤝‍🧑 Holders: ${token.holders}\n⏱️ Edad: ${token.ageMinutes} min`;
+        bot.sendMessage(process.env.CHAT_ID, mensaje, { parse_mode: "Markdown" });
         console.log(mensaje);
-        bot.sendMessage(chatId, mensaje, { parse_mode: "Markdown" });
       });
     } else {
       console.log(`[${new Date().toLocaleTimeString()}] Sin joyas en Pump.fun.`);
     }
-  } catch (e) {
-    console.error("Error escaneando Pump.fun:", e.message);
+  } catch (error) {
+    console.error("Error escaneando Pump.fun:", error.message);
   }
 }
