@@ -1,5 +1,5 @@
-import express from "express";
-import fetch from "node-fetch";
+const express = require("express");
+const fetch = require("node-fetch");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,11 +12,9 @@ app.get("/", async (req, res) => {
   }
 
   try {
-    const response = await fetch(`https://api.mainnet-beta.solana.com`, {
+    const response = await fetch("https://api.mainnet-beta.solana.com", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
@@ -30,6 +28,7 @@ app.get("/", async (req, res) => {
 
     res.send(`Saldo: ${balance / 10 ** 9} SOL`);
   } catch (error) {
+    console.error("Error al obtener el saldo:", error);
     res.status(500).send("Error al obtener el saldo.");
   }
 });
