@@ -4,7 +4,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
-import fs from "fs";
 dotenv.config();
 
 const app = express();
@@ -16,6 +15,7 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 const WALLET = process.env.WALLET_ADDRESS;
 
+// === Web pública ===
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
@@ -48,20 +48,16 @@ app.listen(PORT, () => {
   console.log(`Servidor activo en el puerto ${PORT}`);
 });
 
+// === BOT TELEGRAM ===
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
-const estadoPath = "./estado_bot.json";
 let intervalo = null;
 
 function leerEstado() {
-  try {
-    return JSON.parse(fs.readFileSync(estadoPath));
-  } catch {
-    return { activo: false };
-  }
+  return process.env.BOT_STATE === "on";
 }
 
-function guardarEstado(nuevo) {
-  fs.writeFileSync(estadoPath, JSON.stringify(nuevo));
+function guardarEstado(activo) {
+  process.env.BOT_STATE = activo ? "on" : "off";
 }
 
 function enviarMenu(chatId) {
@@ -83,56 +79,48 @@ function enviarMenu(chatId) {
   });
 }
 
-// === Escaneo profesional de joyas ===
+// === Escaneo Birdeye cada 30s ===
 async function buscarJoyas() {
   try {
-    console.log(`[${new Date().toLocaleTimeString()}] Escaneando tokens...`);
-    const response = await fetch("https://public-api.birdeye.so/defi/tokenlist?chain=solana");
-    const json = await response.json();
+    console.log(`[${new Date().toLocaleTimeString()}] Escaneando joyas...`);
+    const res = await fetch("https://public-api.birdeye.so/defi/tokenlist?chain=solana");
+    const json = await res.json();
     const tokens = json?.data || [];
 
-    const joyas = tokens.filter(token => {
-      const lp = token.liquidity || 0;
-      const vol = token.volume_24h || 0;
-      const mcap = token.market_cap || 0;
-      const holders = token.holder_count || 0;
-      const ageMin = token.age_minutes || 9999;
-      const volRatio = lp > 0 ? vol / lp : 0;
-
+    const joyas = tokens.filter((t) => {
+      const lp = t.liquidity || 0;
+      const vol = t.volume_24h || 0;
+      const age = t.age_minutes || 9999;
       return (
-        lp >= 3000 && lp <= 25000 &&
-        vol >= 10000 &&
-        volRatio >= 3 &&
-        ageMin < 45 &&
-        mcap < 150000 &&
-        holders >= 20 && holders <= 800
+        lp >= 5000 &&
+        lp <= 80000 &&
+        vol > 15000 &&
+        vol / lp > 3 &&
+        age < 45
       );
     });
 
     if (joyas.length > 0) {
       for (const token of joyas) {
-        const mensaje = `
+        const msg = `
 🚀 *Joya Detectada*  
 *Nombre:* ${token.name}  
 *Símbolo:* ${token.symbol}  
-*LP:* $${token.liquidity?.toFixed(0)}  
-*Volumen:* $${token.volume_24h?.toFixed(0)}  
-*Market Cap:* $${token.market_cap?.toFixed(0)}  
-*Holders:* ${token.holder_count}  
-*Edad:* ${token.age_minutes} min  
+*Liquidez:* $${token.liquidity?.toFixed(0)}  
+*Volumen 24h:* $${token.volume_24h?.toFixed(0)}  
 *Ver:* https://birdeye.so/token/${token.address}?chain=solana
         `.trim();
-        await bot.sendMessage(CHAT_ID, mensaje, { parse_mode: "Markdown" });
+        await bot.sendMessage(CHAT_ID, msg, { parse_mode: "Markdown" });
       }
     } else {
       console.log(`[${new Date().toLocaleTimeString()}] Sin joyas.`);
     }
-  } catch (error) {
-    console.error("Error escaneando:", error.message);
+  } catch (e) {
+    console.error("Error escaneando:", e.message);
   }
 }
 
-// === Comandos Telegram ===
+// === Telegram Bot Control ===
 bot.onText(/\/start/, (msg) => {
   if (msg.chat.id.toString() === CHAT_ID) {
     enviarMenu(CHAT_ID);
@@ -144,22 +132,22 @@ bot.on("callback_query", async (query) => {
   if (query.message.chat.id.toString() !== CHAT_ID) return;
 
   if (data === "on") {
-    if (intervalo) return bot.sendMessage(CHAT_ID, "El bot ya está activo.");
-    guardarEstado({ activo: true });
+    if (intervalo) return bot.sendMessage(CHAT_ID, "Ya está activo.");
+    guardarEstado(true);
     intervalo = setInterval(buscarJoyas, 30000);
     buscarJoyas();
-    bot.sendMessage(CHAT_ID, "ZafroBot está ENCENDIDO.");
+    bot.sendMessage(CHAT_ID, "ZafroBot ENCENDIDO.");
   }
 
   if (data === "off") {
-    guardarEstado({ activo: false });
+    guardarEstado(false);
     clearInterval(intervalo);
     intervalo = null;
-    bot.sendMessage(CHAT_ID, "ZafroBot está APAGADO.");
+    bot.sendMessage(CHAT_ID, "ZafroBot APAGADO.");
   }
 
   if (data === "estado") {
-    const estado = leerEstado().activo;
+    const estado = leerEstado();
     bot.sendMessage(CHAT_ID, `Estado actual: ${estado ? "✅ Encendido" : "⛔ Apagado"}`);
   }
 
@@ -177,8 +165,8 @@ bot.on("callback_query", async (query) => {
       });
       const json = await res.json();
       const sol = (json.result?.value || 0) / 10 ** 9;
-      bot.sendMessage(CHAT_ID, `Tu saldo actual es: ${sol.toFixed(4)} SOL`);
-    } catch (e) {
+      bot.sendMessage(CHAT_ID, `Tu saldo: ${sol.toFixed(4)} SOL`);
+    } catch {
       bot.sendMessage(CHAT_ID, "Error consultando saldo.");
     }
   }
@@ -188,14 +176,15 @@ bot.on("callback_query", async (query) => {
   }
 
   if (data === "historial") {
-    bot.sendMessage(CHAT_ID, "Historial vacío (aún no se guarda).");
+    bot.sendMessage(CHAT_ID, "Historial no implementado todavía.");
   }
 
   bot.answerCallbackQuery(query.id);
 });
 
-// Si estaba encendido antes, reanudar escaneo
-if (leerEstado().activo) {
+// === Reanudar tras reinicio ===
+if (leerEstado()) {
   intervalo = setInterval(buscarJoyas, 30000);
   buscarJoyas();
+  console.log("Reanudando escaneo automático tras reinicio.");
 }
