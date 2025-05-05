@@ -51,6 +51,7 @@ app.listen(PORT, () => {
   console.log(`Servidor activo en el puerto ${PORT}`);
 });
 
+// === BOT TELEGRAM ===
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 const estadoPath = "./estado_bot.json";
 let intervalo = null;
@@ -99,12 +100,12 @@ bot.on("callback_query", async (query) => {
   if (data === "on") {
     if (intervalo) return bot.sendMessage(CHAT_ID, "El bot ya está activo.");
     guardarEstado({ activo: true });
-    intervalo = setInterval(() => {
-      escanearPumpFun();
-      escanearBirdeye();
+    intervalo = setInterval(async () => {
+      await escanearPumpFun(bot, CHAT_ID);
+      await escanearBirdeye(bot, CHAT_ID);
     }, 30000);
-    escanearPumpFun();
-    escanearBirdeye();
+    await escanearPumpFun(bot, CHAT_ID);
+    await escanearBirdeye(bot, CHAT_ID);
     bot.sendMessage(CHAT_ID, "ZafroBot está ENCENDIDO.");
   }
 
@@ -151,11 +152,12 @@ bot.on("callback_query", async (query) => {
   bot.answerCallbackQuery(query.id);
 });
 
+// Si estaba encendido, continuar escaneo automático
 if (leerEstado().activo) {
-  intervalo = setInterval(() => {
-    escanearPumpFun();
-    escanearBirdeye();
+  intervalo = setInterval(async () => {
+    await escanearPumpFun(bot, CHAT_ID);
+    await escanearBirdeye(bot, CHAT_ID);
   }, 30000);
-  escanearPumpFun();
-  escanearBirdeye();
+  await escanearPumpFun(bot, CHAT_ID);
+  await escanearBirdeye(bot, CHAT_ID);
 }
