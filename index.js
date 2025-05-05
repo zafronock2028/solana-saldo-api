@@ -83,47 +83,56 @@ function enviarMenu(chatId) {
   });
 }
 
-// NUEVA FUNCIÓN de escaneo con Birdeye
+// === Escaneo profesional de joyas ===
 async function buscarJoyas() {
   try {
-    console.log(`[${new Date().toLocaleTimeString()}] Iniciando escaneo...`);
-    const res = await fetch("https://public-api.birdeye.so/defi/tokenlist?chain=solana");
-    const json = await res.json();
+    console.log(`[${new Date().toLocaleTimeString()}] Escaneando tokens...`);
+    const response = await fetch("https://public-api.birdeye.so/defi/tokenlist?chain=solana");
+    const json = await response.json();
     const tokens = json?.data || [];
 
-    const joyas = tokens.filter((t) => {
-      const lp = t.liquidity || 0;
-      const vol = t.volume_24h || 0;
-      const age = t.age_minutes || 9999;
+    const joyas = tokens.filter(token => {
+      const lp = token.liquidity || 0;
+      const vol = token.volume_24h || 0;
+      const mcap = token.market_cap || 0;
+      const holders = token.holder_count || 0;
+      const ageMin = token.age_minutes || 9999;
+      const volRatio = lp > 0 ? vol / lp : 0;
+
       return (
-        lp >= 5000 &&
-        lp <= 80000 &&
-        vol > 15000 &&
-        vol / lp > 3 &&
-        age < 45
+        lp >= 3000 && lp <= 25000 &&
+        vol >= 10000 &&
+        volRatio >= 3 &&
+        ageMin < 45 &&
+        mcap < 150000 &&
+        holders >= 20 && holders <= 800
       );
     });
 
     if (joyas.length > 0) {
       for (const token of joyas) {
-        const msg = `
+        const mensaje = `
 🚀 *Joya Detectada*  
 *Nombre:* ${token.name}  
 *Símbolo:* ${token.symbol}  
-*Liquidez:* $${token.liquidity?.toFixed(0)}  
-*Volumen 24h:* $${token.volume_24h?.toFixed(0)}  
+*LP:* $${token.liquidity?.toFixed(0)}  
+*Volumen:* $${token.volume_24h?.toFixed(0)}  
+*Market Cap:* $${token.market_cap?.toFixed(0)}  
+*Holders:* ${token.holder_count}  
+*Edad:* ${token.age_minutes} min  
 *Ver:* https://birdeye.so/token/${token.address}?chain=solana
         `.trim();
-        await bot.sendMessage(CHAT_ID, msg, { parse_mode: "Markdown" });
+        await bot.sendMessage(CHAT_ID, mensaje, { parse_mode: "Markdown" });
       }
     } else {
       console.log(`[${new Date().toLocaleTimeString()}] Sin joyas.`);
     }
-  } catch (e) {
-    console.error("Error escaneando:", e.message);
+  } catch (error) {
+    console.error("Error escaneando:", error.message);
   }
 }
 
+// === Comandos Telegram ===
 bot.onText(/\/start/, (msg) => {
   if (msg.chat.id.toString() === CHAT_ID) {
     enviarMenu(CHAT_ID);
@@ -137,7 +146,7 @@ bot.on("callback_query", async (query) => {
   if (data === "on") {
     if (intervalo) return bot.sendMessage(CHAT_ID, "El bot ya está activo.");
     guardarEstado({ activo: true });
-    intervalo = setInterval(buscarJoyas, 60000);
+    intervalo = setInterval(buscarJoyas, 30000);
     buscarJoyas();
     bot.sendMessage(CHAT_ID, "ZafroBot está ENCENDIDO.");
   }
@@ -185,7 +194,8 @@ bot.on("callback_query", async (query) => {
   bot.answerCallbackQuery(query.id);
 });
 
+// Si estaba encendido antes, reanudar escaneo
 if (leerEstado().activo) {
-  intervalo = setInterval(buscarJoyas, 60000);
+  intervalo = setInterval(buscarJoyas, 30000);
   buscarJoyas();
 }
