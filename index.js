@@ -48,7 +48,6 @@ app.listen(PORT, () => {
   console.log(`Servidor activo en el puerto ${PORT}`);
 });
 
-// === BOT TELEGRAM ===
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 const estadoPath = "./estado_bot.json";
 let intervalo = null;
@@ -84,24 +83,22 @@ function enviarMenu(chatId) {
   });
 }
 
-// === Lógica para buscar joyas (versión corregida con DexScreener) ===
+// === Lógica para buscar joyas ===
 async function buscarJoyas() {
   try {
     const res = await fetch("https://api.dexscreener.com/latest/dex/pairs/solana");
-    const data = await res.json();
-    const tokens = data.pairs;
+    const json = await res.json();
 
-    const joyas = tokens.filter((t) => {
+    const joyas = json.pairs.filter((t) => {
       const liquidez = t.liquidity?.usd || 0;
       const volumen = t.volume?.h24 || 0;
-      const creadoHaceMin = (Date.now() - new Date(t.pairCreatedAt).getTime()) / (1000 * 60);
-
+      const edad = t.ageMinutes || 9999;
       return (
         liquidez >= 5000 &&
         liquidez <= 80000 &&
         volumen > 15000 &&
         volumen / liquidez > 3 &&
-        creadoHaceMin < 45
+        edad < 45
       );
     });
 
@@ -111,11 +108,8 @@ async function buscarJoyas() {
 🚀 *Joya Detectada*  
 *Nombre:* ${token.baseToken.name}  
 *Símbolo:* ${token.baseToken.symbol}  
-*Liquidez:* $${token.liquidity.usd}  
-*Volumen:* $${token.volume.h24}  
-*Edad:* ${Math.floor(
-          (Date.now() - new Date(token.pairCreatedAt).getTime()) / 60000
-        )} min  
+*Liquidez:* $${token.liquidity?.usd}  
+*Volumen:* $${token.volume?.h24}  
 *Ver:* ${token.url}
         `.trim();
         await bot.sendMessage(CHAT_ID, mensaje, { parse_mode: "Markdown" });
@@ -128,7 +122,6 @@ async function buscarJoyas() {
   }
 }
 
-// === Control desde Telegram ===
 bot.onText(/\/start/, (msg) => {
   if (msg.chat.id.toString() === CHAT_ID) {
     enviarMenu(CHAT_ID);
@@ -190,7 +183,6 @@ bot.on("callback_query", async (query) => {
   bot.answerCallbackQuery(query.id);
 });
 
-// === Si el bot estaba encendido antes, reanudar ===
 if (leerEstado().activo) {
   intervalo = setInterval(buscarJoyas, 60000);
   buscarJoyas();
