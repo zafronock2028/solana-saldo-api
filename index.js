@@ -208,7 +208,9 @@ bot.on("callback_query", async (query) => {
   bot.answerCallbackQuery(query.id);
 });
 
-if (leerEstado().activo) {
-  intervalo = setInterval(buscarJoyas, 60000);
-  buscarJoyas();
+// === Al iniciar, desactiva automáticamente el bot ===
+const estadoInicial = leerEstado();
+if (estadoInicial.activo) {
+  guardarEstado({ activo: false });
+  console.log("Bot estaba encendido antes, ahora se apagó automáticamente.");
 }
