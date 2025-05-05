@@ -86,6 +86,11 @@ function enviarMenu(chatId) {
   });
 }
 
+async function escanearAmbas() {
+  await escanearPumpFun();
+  await escanearBirdeye();
+}
+
 bot.onText(/\/start/, (msg) => {
   if (msg.chat.id.toString() === CHAT_ID) {
     enviarMenu(CHAT_ID);
@@ -99,15 +104,8 @@ bot.on("callback_query", async (query) => {
   if (data === "on") {
     if (intervalo) return bot.sendMessage(CHAT_ID, "El bot ya está activo.");
     guardarEstado({ activo: true });
-
-    intervalo = setInterval(() => {
-      escanearPumpFun();
-      escanearBirdeye();
-    }, 30000);
-
-    escanearPumpFun();
-    escanearBirdeye();
-
+    intervalo = setInterval(escanearAmbas, 30000);
+    escanearAmbas();
     bot.sendMessage(CHAT_ID, "ZafroBot está ENCENDIDO.");
   }
 
@@ -154,13 +152,7 @@ bot.on("callback_query", async (query) => {
   bot.answerCallbackQuery(query.id);
 });
 
-// Auto encendido si estaba previamente activo
 if (leerEstado().activo) {
-  intervalo = setInterval(() => {
-    escanearPumpFun();
-    escanearBirdeye();
-  }, 30000);
-
-  escanearPumpFun();
-  escanearBirdeye();
+  intervalo = setInterval(escanearAmbas, 30000);
+  escanearAmbas();
 }
