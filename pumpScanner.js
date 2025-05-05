@@ -3,7 +3,7 @@ import fetch from "node-fetch";
 export async function escanearPumpFun(bot, chatId) {
   console.log(`[${new Date().toLocaleTimeString()}] Escaneando en Pump.fun...`);
   try {
-    const res = await fetch("https://pump-api-proxy.fly.dev/api/tokens");
+    const res = await fetch("https://client-api-2-743b8b4ee2bf.herokuapp.com/api/tokens");
     const tokens = await res.json();
 
     const joyas = tokens.filter((t) => {
