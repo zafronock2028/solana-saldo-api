@@ -1,31 +1,35 @@
 import express from "express";
 import fetch from "node-fetch";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Servir archivos estáticos desde la carpeta "public"
-app.use(express.static("public"));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-app.get("/", async (req, res) => {
+// Servir archivos estáticos desde "public"
+app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+app.get("/saldo", async (req, res) => {
   const wallet = req.query.wallet;
-
-  if (!wallet) {
-    return res.sendFile("index.html", { root: "public" });
-  }
+  if (!wallet) return res.status(400).send("Falta la dirección de wallet");
 
   try {
     const response = await fetch("https://api.mainnet-beta.solana.com", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
         method: "getBalance",
-        params: [wallet]
-      })
+        params: [wallet],
+      }),
     });
 
     const data = await response.json();
