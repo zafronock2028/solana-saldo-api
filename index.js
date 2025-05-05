@@ -16,7 +16,7 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 const WALLET = process.env.WALLET_ADDRESS;
 
-// === Servir el sitio web de consulta de saldo ===
+// === Servir frontend ===
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
@@ -49,7 +49,7 @@ app.listen(PORT, () => {
   console.log(`Servidor activo en el puerto ${PORT}`);
 });
 
-// === BOT TELEGRAM ===
+// === Telegram Bot ===
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 const estadoPath = "./estado_bot.json";
 let intervalo = null;
@@ -85,55 +85,52 @@ function enviarMenu(chatId) {
   });
 }
 
-// === Lógica para buscar joyas ===
+// === Escaneo de joyas con logs ===
 async function buscarJoyas() {
+  console.log(`[${new Date().toLocaleTimeString()}] Iniciando escaneo...`);
   try {
-    const res = await fetch("https://gmgn.ai/api/tokens");
-    const text = await res.text();
+    const res = await fetch("https://api.dexscreener.com/latest/dex/pairs/solana");
+    const json = await res.json();
+    const tokens = json.pairs || [];
 
-    let tokens;
-    try {
-      tokens = JSON.parse(text);
-    } catch (jsonError) {
-      console.error("Respuesta inválida de GMGN:", text.slice(0, 100));
-      return;
-    }
+    console.log(`Tokens recibidos: ${tokens.length}`);
 
     const joyas = tokens.filter((t) => {
-      const liquidez = t.liquidity_usd || 0;
-      const volumen = t.volume_usd || 0;
-      const edad = t.age_minutes || 9999;
+      const liquidez = parseFloat(t.liquidity?.usd || 0);
+      const volumen = parseFloat(t.volume?.h1 || 0);
+      const creadoHaceMin = (Date.now() - new Date(t.pairCreatedAt).getTime()) / 60000;
       return (
         liquidez >= 5000 &&
         liquidez <= 80000 &&
         volumen > 15000 &&
         volumen / liquidez > 3 &&
-        edad < 45
+        creadoHaceMin < 45
       );
     });
+
+    console.log(`Joyas detectadas: ${joyas.length}`);
 
     if (joyas.length > 0) {
       for (const token of joyas) {
         const mensaje = `
 🚀 *Joya Detectada*  
-*Nombre:* ${token.name}  
-*Símbolo:* ${token.symbol}  
-*Liquidez:* $${token.liquidity_usd}  
-*Volumen:* $${token.volume_usd}  
-*Edad:* ${token.age_minutes} min  
-*Ver:* https://dexscreener.com/solana/${token.address}
+*Nombre:* ${token.baseToken.name}  
+*Símbolo:* ${token.baseToken.symbol}  
+*Liquidez:* $${token.liquidity.usd}  
+*Volumen (1h):* $${token.volume.h1}  
+*Ver:* ${token.url}
         `.trim();
         await bot.sendMessage(CHAT_ID, mensaje, { parse_mode: "Markdown" });
       }
     } else {
-      console.log(`[${new Date().toLocaleTimeString()}] Sin joyas.`);
+      console.log("Sin joyas en este ciclo.");
     }
   } catch (err) {
     console.error("Error escaneando:", err.message);
   }
 }
 
-// === Control desde Telegram ===
+// === Bot Telegram control ===
 bot.onText(/\/start/, (msg) => {
   if (msg.chat.id.toString() === CHAT_ID) {
     enviarMenu(CHAT_ID);
@@ -195,7 +192,7 @@ bot.on("callback_query", async (query) => {
   bot.answerCallbackQuery(query.id);
 });
 
-// === Si el bot estaba encendido antes, reanudar ===
+// === Reanudar si estaba encendido ===
 if (leerEstado().activo) {
   intervalo = setInterval(buscarJoyas, 60000);
   buscarJoyas();
