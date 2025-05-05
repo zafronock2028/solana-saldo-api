@@ -1,7 +1,7 @@
 {
   "name": "zafrobot-joyas-x100",
   "version": "1.0.0",
-  "description": "ZafroBot Joyas X100 escanea Birdeye y Pump.fun en busca de gemas.",
+  "description": "ZafroBot Joyas X100 escanea Birdeye, Pump.fun y Bitquery",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
     "fs": "^0.0.1-security",
-    "node-fetch": "^2.6.9",
+    "node-fetch": "^3.3.2",
     "node-telegram-bot-api": "^0.61.0"
   }
 }
