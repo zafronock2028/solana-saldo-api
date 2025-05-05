@@ -9,17 +9,18 @@ export const escanearBirdeye = async () => {
       const lp = t.liquidity || 0;
       const vol = t.volume_24h || 0;
       const age = t.age_minutes || 9999;
+
       return (
-        lp >= 3000 && lp <= 75000 &&
-        vol >= 15000 &&
-        vol / lp >= 3 &&
-        age <= 45
+        lp >= 3500 && lp <= 70000 &&
+        vol >= 25000 &&
+        vol / lp >= 3.5 &&
+        age <= 40
       );
     });
 
     if (joyas.length > 0) {
       joyas.forEach((t) => {
-        console.log(`🟢 Birdeye: ${t.name} (${t.symbol}) | LP: $${t.liquidity} | Vol: $${t.volume_24h}`);
+        console.log(`🟢 Birdeye: ${t.name} (${t.symbol}) | LP: $${t.liquidity} | Vol: $${t.volume_24h} | Edad: ${t.age_minutes} min`);
       });
     } else {
       console.log(`[${new Date().toLocaleTimeString()}] Sin joyas en Birdeye.`);
