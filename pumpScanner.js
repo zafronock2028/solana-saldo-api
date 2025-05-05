@@ -12,16 +12,16 @@ export async function escanearPumpFun() {
       const age = (Date.now() - new Date(t.created_at)) / 60000;
 
       return (
-        lp >= 2000 && lp <= 75000 &&
-        vol >= 15000 &&
-        holders >= 50 &&
-        age <= 35
+        lp >= 2500 && lp <= 60000 &&
+        vol >= 20000 &&
+        holders >= 70 &&
+        age <= 30
       );
     });
 
     if (joyas.length > 0) {
       joyas.forEach((t) => {
-        console.log(`🟡 Pump.fun: ${t.name} (${t.symbol}) | LP: $${t.liquidity} | Vol: $${t.volume} | Holders: ${t.holders}`);
+        console.log(`🟡 Pump.fun: ${t.name} (${t.symbol}) | LP: $${t.liquidity} | Vol: $${t.volume} | Holders: ${t.holders} | Edad: ${((Date.now() - new Date(t.created_at)) / 60000).toFixed(1)} min`);
       });
     } else {
       console.log(`[${new Date().toLocaleTimeString()}] Sin joyas en Pump.fun.`);
