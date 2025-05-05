@@ -3,10 +3,71 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Saldo de Wallet Solana</title>
+  <title>Consulta tu saldo en Solana</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #000;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 30px;
+      background: linear-gradient(90deg, #00ffa3, #dc1fff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+    }
+
+    input {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      width: 300px;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    button {
+      padding: 12px 25px;
+      background: linear-gradient(90deg, #00ffa3, #dc1fff);
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: bold;
+      color: #000;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      opacity: 0.85;
+    }
+
+    #resultado {
+      margin-top: 25px;
+      font-size: 1.4rem;
+      color: #00ffa3;
+      text-shadow: 0 0 10px #00ffa3;
+    }
+  </style>
 </head>
 <body>
-  <h1>Saldo de tu Wallet</h1>
+  <h1>Consulta tu saldo en Solana</h1>
   <form id="form">
     <input type="text" id="wallet" placeholder="Ingresa tu wallet de Solana" />
     <button type="submit">Consultar</button>
@@ -19,10 +80,21 @@
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const wallet = document.getElementById('wallet').value;
-      const res = await fetch(`/saldo?wallet=${wallet}`);
-      const text = await res.text();
-      resultado.innerText = text;
+      const wallet = document.getElementById('wallet').value.trim();
+      if (!wallet) {
+        resultado.innerText = 'Por favor ingresa una wallet válida.';
+        return;
+      }
+
+      resultado.innerText = 'Consultando...';
+
+      try {
+        const res = await fetch(`/?wallet=${wallet}`);
+        const text = await res.text();
+        resultado.innerText = text;
+      } catch (error) {
+        resultado.innerText = 'Error al consultar el saldo.';
+      }
     });
   </script>
 </body>
