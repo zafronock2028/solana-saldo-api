@@ -1,3 +1,4 @@
+// index.js
 import express from "express";
 import fetch from "node-fetch";
 import path from "path";
@@ -7,7 +8,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import { escanearPumpFun } from "./pumpScanner.js";
 import { escanearBirdeye } from "./birdeyeScanner.js";
-import { escanearBitquery } from "./bitqueryScanner.js"; // NUEVA IMPORTACIÓN
+import { escanearBitquery } from "./bitqueryScanner.js";
 
 dotenv.config();
 
@@ -19,6 +20,8 @@ const __dirname = path.dirname(__filename);
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 const WALLET = process.env.WALLET_ADDRESS;
+
+const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => {
@@ -52,7 +55,6 @@ app.listen(PORT, () => {
   console.log(`Servidor activo en el puerto ${PORT}`);
 });
 
-const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 const estadoPath = "./estado_bot.json";
 let intervalo = null;
 
@@ -87,10 +89,10 @@ function enviarMenu(chatId) {
   });
 }
 
-async function escanearAmbos() {
+async function escanearTodo() {
   await escanearPumpFun(bot, CHAT_ID);
   await escanearBirdeye(bot, CHAT_ID);
-  await escanearBitquery(bot, CHAT_ID); // NUEVO ESCANEO
+  await escanearBitquery(bot, CHAT_ID);
 }
 
 bot.onText(/\/start/, (msg) => {
@@ -106,8 +108,8 @@ bot.on("callback_query", async (query) => {
   if (data === "on") {
     if (intervalo) return bot.sendMessage(CHAT_ID, "El bot ya está activo.");
     guardarEstado({ activo: true });
-    intervalo = setInterval(escanearAmbos, 30000);
-    escanearAmbos();
+    intervalo = setInterval(escanearTodo, 30000);
+    escanearTodo();
     bot.sendMessage(CHAT_ID, "ZafroBot está ENCENDIDO.");
   }
 
@@ -155,6 +157,6 @@ bot.on("callback_query", async (query) => {
 });
 
 if (leerEstado().activo) {
-  intervalo = setInterval(escanearAmbos, 30000);
-  escanearAmbos();
+  intervalo = setInterval(escanearTodo, 30000);
+  escanearTodo();
 }
