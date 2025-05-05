@@ -16,7 +16,6 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 const WALLET = process.env.WALLET_ADDRESS;
 
-// === Servir el sitio web de consulta de saldo ===
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
@@ -85,22 +84,24 @@ function enviarMenu(chatId) {
   });
 }
 
-// === Lógica para buscar joyas ===
+// === Lógica para buscar joyas (versión corregida con DexScreener) ===
 async function buscarJoyas() {
   try {
-    const res = await fetch("https://gmgn.ai/api/tokens");
-    const tokens = await res.json();
+    const res = await fetch("https://api.dexscreener.com/latest/dex/pairs/solana");
+    const data = await res.json();
+    const tokens = data.pairs;
 
     const joyas = tokens.filter((t) => {
-      const liquidez = t.liquidity_usd || 0;
-      const volumen = t.volume_usd || 0;
-      const edad = t.age_minutes || 9999;
+      const liquidez = t.liquidity?.usd || 0;
+      const volumen = t.volume?.h24 || 0;
+      const creadoHaceMin = (Date.now() - new Date(t.pairCreatedAt).getTime()) / (1000 * 60);
+
       return (
         liquidez >= 5000 &&
         liquidez <= 80000 &&
         volumen > 15000 &&
         volumen / liquidez > 3 &&
-        edad < 45
+        creadoHaceMin < 45
       );
     });
 
@@ -108,12 +109,14 @@ async function buscarJoyas() {
       for (const token of joyas) {
         const mensaje = `
 🚀 *Joya Detectada*  
-*Nombre:* ${token.name}  
-*Símbolo:* ${token.symbol}  
-*Liquidez:* $${token.liquidity_usd}  
-*Volumen:* $${token.volume_usd}  
-*Edad:* ${token.age_minutes} min  
-*Ver:* https://dexscreener.com/solana/${token.address}
+*Nombre:* ${token.baseToken.name}  
+*Símbolo:* ${token.baseToken.symbol}  
+*Liquidez:* $${token.liquidity.usd}  
+*Volumen:* $${token.volume.h24}  
+*Edad:* ${Math.floor(
+          (Date.now() - new Date(token.pairCreatedAt).getTime()) / 60000
+        )} min  
+*Ver:* ${token.url}
         `.trim();
         await bot.sendMessage(CHAT_ID, mensaje, { parse_mode: "Markdown" });
       }
