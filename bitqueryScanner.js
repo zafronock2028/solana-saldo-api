@@ -40,7 +40,9 @@ export async function escanearBitquery() {
       body: JSON.stringify(query),
     });
 
-    const data = await res.json();
+    const text = await response.text();
+console.log("Respuesta de Bitquery sin procesar:", text);
+return;
 
     if (data.errors) {
       console.error("Error en respuesta de Bitquery:", data.errors);
