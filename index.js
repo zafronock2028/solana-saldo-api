@@ -15,8 +15,11 @@ const __dirname = path.dirname(__filename);
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 const WALLET = process.env.WALLET_ADDRESS;
+const HISTORIAL_PATH = "./historial.json";
+const estadoPath = "./estado_bot.json";
 
-// === Servir el sitio web de consulta de saldo ===
+let intervalo = null;
+
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
@@ -49,10 +52,8 @@ app.listen(PORT, () => {
   console.log(`Servidor activo en el puerto ${PORT}`);
 });
 
-// === BOT TELEGRAM ===
+// === TELEGRAM BOT ===
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
-const estadoPath = "./estado_bot.json";
-let intervalo = null;
 
 function leerEstado() {
   try {
@@ -64,6 +65,25 @@ function leerEstado() {
 
 function guardarEstado(nuevo) {
   fs.writeFileSync(estadoPath, JSON.stringify(nuevo));
+}
+
+function guardarJoya(joya) {
+  let historial = [];
+  if (fs.existsSync(HISTORIAL_PATH)) {
+    historial = JSON.parse(fs.readFileSync(HISTORIAL_PATH));
+  }
+  if (!historial.some(t => t.address === joya.address)) {
+    historial.unshift({
+      nombre: joya.name,
+      symbol: joya.symbol,
+      address: joya.address,
+      liquidez: joya.liquidity_usd,
+      volumen: joya.volume_usd,
+      edad: joya.age_minutes,
+      timestamp: new Date().toISOString()
+    });
+    fs.writeFileSync(HISTORIAL_PATH, JSON.stringify(historial, null, 2));
+  }
 }
 
 function enviarMenu(chatId) {
@@ -79,13 +99,12 @@ function enviarMenu(chatId) {
   });
 }
 
-// === Lógica para buscar joyas ===
 async function buscarJoyas() {
   try {
     const res = await fetch("https://gmgn.ai/api/tokens");
     const tokens = await res.json();
 
-    const joyas = tokens.filter((t) => {
+    const joyas = tokens.filter(t => {
       const liquidez = t.liquidity_usd || 0;
       const volumen = t.volume_usd || 0;
       const edad = t.age_minutes || 9999;
@@ -101,14 +120,15 @@ async function buscarJoyas() {
     if (joyas.length > 0) {
       for (const token of joyas) {
         const mensaje = `
-🚀 *Joya Detectada*  
-*Nombre:* ${token.name}  
-*Símbolo:* ${token.symbol}  
-*Liquidez:* $${token.liquidity_usd}  
-*Volumen:* $${token.volume_usd}  
-*Edad:* ${token.age_minutes} min  
-*Ver:* https://dexscreener.com/solana/${token.address}
+🚀 *Joya Detectada*
+*Nombre:* ${token.name}
+*Símbolo:* ${token.symbol}
+*Liquidez:* $${token.liquidity_usd}
+*Volumen:* $${token.volume_usd}
+*Edad:* ${token.age_minutes} min
+[Ver en Dexscreener](https://dexscreener.com/solana/${token.address})
         `.trim();
+        guardarJoya(token);
         await bot.sendMessage(CHAT_ID, mensaje, { parse_mode: "Markdown" });
       }
     } else {
@@ -119,11 +139,8 @@ async function buscarJoyas() {
   }
 }
 
-// === Control desde Telegram ===
 bot.onText(/\/start/, (msg) => {
-  if (msg.chat.id.toString() === CHAT_ID) {
-    enviarMenu(CHAT_ID);
-  }
+  if (msg.chat.id.toString() === CHAT_ID) enviarMenu(CHAT_ID);
 });
 
 bot.on("callback_query", async (query) => {
@@ -175,13 +192,22 @@ bot.on("callback_query", async (query) => {
   }
 
   if (data === "historial") {
-    bot.sendMessage(CHAT_ID, "Historial vacío (aún no se guarda).");
+    if (!fs.existsSync(HISTORIAL_PATH)) {
+      return bot.sendMessage(CHAT_ID, "No hay historial guardado.");
+    }
+
+    const historial = JSON.parse(fs.readFileSync(HISTORIAL_PATH));
+    if (historial.length === 0) {
+      return bot.sendMessage(CHAT_ID, "Historial vacío.");
+    }
+
+    const ultimas = historial.slice(0, 5).map(t => `• ${t.nombre} (${t.symbol})\n$${t.liquidez} / $${t.volumen} - Edad: ${t.edad} min`).join("\n\n");
+    bot.sendMessage(CHAT_ID, `Últimas joyas:\n\n${ultimas}`);
   }
 
   bot.answerCallbackQuery(query.id);
 });
 
-// === Si el bot estaba encendido antes, reanudar ===
 if (leerEstado().activo) {
   intervalo = setInterval(buscarJoyas, 60000);
   buscarJoyas();
