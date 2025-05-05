@@ -1,4 +1,12 @@
 import fetch from "node-fetch";
+import dotenv from "dotenv";
+import TelegramBot from "node-telegram-bot-api";
+
+dotenv.config();
+
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID = process.env.CHAT_ID;
+const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
 
 export async function escanearPumpFun() {
   console.log(`[${new Date().toLocaleTimeString()}] Escaneando en Pump.fun...`);
@@ -22,9 +30,21 @@ export async function escanearPumpFun() {
     });
 
     if (joyas.length > 0) {
-      joyas.forEach((t) => {
+      for (const t of joyas) {
         console.log(`🟡 Pump.fun: ${t.name} (${t.symbol}) | LP: $${t.liquidity} | Vol: $${t.volume} | Holders: ${t.holders}`);
-      });
+
+        const mensaje = `
+🚀 *Joya Detectada en Pump.fun*  
+*Nombre:* ${t.name}  
+*Símbolo:* ${t.symbol}  
+*LP:* $${t.liquidity}  
+*Volumen:* $${t.volume}  
+*Holders:* ${t.holders}  
+*Ver:* https://pump.fun/${t.symbol}
+        `.trim();
+
+        await bot.sendMessage(CHAT_ID, mensaje, { parse_mode: "Markdown" });
+      }
     } else {
       console.log(`[${new Date().toLocaleTimeString()}] Sin joyas en Pump.fun.`);
     }
