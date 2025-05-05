@@ -1,4 +1,3 @@
-// index.js
 import express from "express";
 import fetch from "node-fetch";
 import path from "path";
