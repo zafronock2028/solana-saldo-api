@@ -1,43 +1,43 @@
-import fetch from "node-fetch";
-import TelegramBot from "node-telegram-bot-api";
-import dotenv from "dotenv";
+import fs from 'fs';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { Program, AnchorProvider } from '@project-serum/anchor';
+import idl from './pump.json' assert { type: 'json' };
+import dotenv from 'dotenv';
+
 dotenv.config();
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN);
+const connection = new Connection('https://api.mainnet-beta.solana.com');
+const provider = new AnchorProvider(connection, {}, {});
+const programId = new PublicKey('PumPpTunA9D49qkZ2TBeCpYTxUN1UbkXHc3i7zALvN2');
+const program = new Program(idl, programId, provider);
+
+const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
 export async function escanearPumpFun(bot, chatId) {
-  console.log(`[${new Date().toLocaleTimeString()}] Escaneando en Pump.fun...`);
   try {
-    const res = await fetch("https://client-api-2-743b8b4ee2bf.herokuapp.com/api/tokens");
-    const tokens = await res.json();
+    console.log(`[${new Date().toLocaleTimeString()}] Escaneando Pump.fun desde blockchain...`);
 
-    const joyas = tokens.filter((t) => {
-      const lp = t.liquidity || 0;
-      const vol = t.volume || 0;
-      const holders = t.holders || 0;
-      const age = (Date.now() - new Date(t.created_at)) / 60000;
-      const mc = t.fully_diluted_market_cap || 0;
-
-      return (
-        lp >= 3000 &&
-        lp <= 75000 &&
-        vol >= 18000 &&
-        holders >= 60 &&
-        age <= 30 &&
-        mc >= 100000 && mc <= 1500000
-      );
+    const accounts = await connection.getProgramAccounts(programId, {
+      filters: [{ dataSize: 165 }]
     });
 
-    for (const t of joyas) {
-      const mensaje = `🟡 *Pump.fun Detected Gem*\n\n🪙 Token: *${t.name} (${t.symbol})*\n💧 LP: $${t.liquidity}\n📈 Vol: $${t.volume}\n👥 Holders: ${t.holders}\n⏱️ Edad: ${((Date.now() - new Date(t.created_at)) / 60000).toFixed(1)} min\n💵 MC: $${t.fully_diluted_market_cap}`;
-      console.log(mensaje);
-      await bot.sendMessage(chatId, mensaje, { parse_mode: "Markdown" });
+    if (!accounts || accounts.length === 0) {
+      return console.log("No se encontraron tokens.");
     }
 
-    if (joyas.length === 0) {
-      console.log(`[${new Date().toLocaleTimeString()}] Sin joyas en Pump.fun.`);
+    for (const acc of accounts) {
+      const createdAt = (await connection.getParsedAccountInfo(acc.pubkey)).value?.data?.parsed?.info?.createdAt;
+      const currentSlot = await connection.getSlot();
+      const blockTime = await connection.getBlockTime(currentSlot);
+      const edad = createdAt ? (blockTime - createdAt) / 60 : 9999;
+
+      if (edad < 30) {
+        bot.sendMessage(chatId, `🟡 *Pump.fun - Gem Found*\n\nCA: \`${acc.pubkey.toBase58()}\`\nEdad: ${edad.toFixed(2)} min`, { parse_mode: "Markdown" });
+      }
+
+      await delay(250);
     }
-  } catch (e) {
-    console.error("Error escaneando Pump.fun:", e.message);
+  } catch (err) {
+    console.error("Error escaneando Pump.fun:", err.message);
   }
 }
