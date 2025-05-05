@@ -1,21 +1,22 @@
-
 import fetch from "node-fetch";
 
-// Primer módulo: escanear tokens desde GMGN.ai
-const GMGN_API_URL = "https://gmgn.ai/api/tokens";
+// API pública de Dexscreener (filtrando por Solana)
+const API_URL = "https://api.dexscreener.com/latest/dex/pairs/solana";
 
-// Lógica inicial para buscar joyas potenciales
 async function buscarJoyas() {
   try {
-    const response = await fetch(GMGN_API_URL);
-    const tokens = await response.json();
+    const response = await fetch(API_URL);
+    const data = await response.json();
 
-    const filtradas = tokens.filter(token => {
-      const liquidez = token.liquidity_usd || 0;
-      const volumen = token.volume_usd || 0;
-      const edadMin = token.age_minutes || 9999;
+    if (!data.pairs) {
+      throw new Error("No se encontraron pares");
+    }
 
-      // Filtros clave para detectar joyas potenciales
+    const filtradas = data.pairs.filter((pair) => {
+      const liquidez = pair.liquidity?.usd || 0;
+      const volumen = pair.volume?.h24 || 0;
+      const edadMin = (Date.now() - new Date(pair.pairCreatedAt).getTime()) / 60000;
+
       return (
         liquidez >= 5000 &&
         liquidez <= 80000 &&
@@ -25,16 +26,22 @@ async function buscarJoyas() {
       );
     });
 
-    console.log("Joyas encontradas:", filtradas.length);
-    filtradas.forEach(joya => {
-      console.log(`- ${joya.name} (${joya.symbol}): Liquidez $${joya.liquidity_usd}, Volumen $${joya.volume_usd}, Edad ${joya.age_minutes} min`);
+    console.clear();
+    console.log(`[${new Date().toLocaleTimeString()}] Joyas encontradas: ${filtradas.length}`);
+    filtradas.forEach((j) => {
+      console.log(`- ${j.baseToken.name} (${j.baseToken.symbol})`);
+      console.log(`  Liquidez: $${j.liquidity.usd}`);
+      console.log(`  Volumen 24h: $${j.volume.h24}`);
+      console.log(`  Edad: ${Math.round((Date.now() - new Date(j.pairCreatedAt)) / 60000)} min`);
+      console.log(`  Link: ${j.url}`);
+      console.log("--------------------------------------------------");
     });
 
   } catch (error) {
-    console.error("Error al buscar tokens en GMGN:", error.message);
+    console.error("Error al buscar joyas:", error.message);
   }
 }
 
-// Ejecutar escaneo cada 60 segundos
+// Escanear cada 60 segundos
 setInterval(buscarJoyas, 60000);
 buscarJoyas();
