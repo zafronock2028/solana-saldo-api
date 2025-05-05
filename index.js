@@ -16,7 +16,6 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 const WALLET = process.env.WALLET_ADDRESS;
 
-// === Servir frontend ===
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
@@ -49,7 +48,6 @@ app.listen(PORT, () => {
   console.log(`Servidor activo en el puerto ${PORT}`);
 });
 
-// === Telegram Bot ===
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 const estadoPath = "./estado_bot.json";
 let intervalo = null;
@@ -85,52 +83,47 @@ function enviarMenu(chatId) {
   });
 }
 
-// === Escaneo de joyas con logs ===
+// NUEVA FUNCIÓN de escaneo con Birdeye
 async function buscarJoyas() {
-  console.log(`[${new Date().toLocaleTimeString()}] Iniciando escaneo...`);
   try {
-    const res = await fetch("https://api.dexscreener.com/latest/dex/pairs/solana");
+    console.log(`[${new Date().toLocaleTimeString()}] Iniciando escaneo...`);
+    const res = await fetch("https://public-api.birdeye.so/defi/tokenlist?chain=solana");
     const json = await res.json();
-    const tokens = json.pairs || [];
-
-    console.log(`Tokens recibidos: ${tokens.length}`);
+    const tokens = json?.data || [];
 
     const joyas = tokens.filter((t) => {
-      const liquidez = parseFloat(t.liquidity?.usd || 0);
-      const volumen = parseFloat(t.volume?.h1 || 0);
-      const creadoHaceMin = (Date.now() - new Date(t.pairCreatedAt).getTime()) / 60000;
+      const lp = t.liquidity || 0;
+      const vol = t.volume_24h || 0;
+      const age = t.age_minutes || 9999;
       return (
-        liquidez >= 5000 &&
-        liquidez <= 80000 &&
-        volumen > 15000 &&
-        volumen / liquidez > 3 &&
-        creadoHaceMin < 45
+        lp >= 5000 &&
+        lp <= 80000 &&
+        vol > 15000 &&
+        vol / lp > 3 &&
+        age < 45
       );
     });
 
-    console.log(`Joyas detectadas: ${joyas.length}`);
-
     if (joyas.length > 0) {
       for (const token of joyas) {
-        const mensaje = `
+        const msg = `
 🚀 *Joya Detectada*  
-*Nombre:* ${token.baseToken.name}  
-*Símbolo:* ${token.baseToken.symbol}  
-*Liquidez:* $${token.liquidity.usd}  
-*Volumen (1h):* $${token.volume.h1}  
-*Ver:* ${token.url}
+*Nombre:* ${token.name}  
+*Símbolo:* ${token.symbol}  
+*Liquidez:* $${token.liquidity?.toFixed(0)}  
+*Volumen 24h:* $${token.volume_24h?.toFixed(0)}  
+*Ver:* https://birdeye.so/token/${token.address}?chain=solana
         `.trim();
-        await bot.sendMessage(CHAT_ID, mensaje, { parse_mode: "Markdown" });
+        await bot.sendMessage(CHAT_ID, msg, { parse_mode: "Markdown" });
       }
     } else {
-      console.log("Sin joyas en este ciclo.");
+      console.log(`[${new Date().toLocaleTimeString()}] Sin joyas.`);
     }
-  } catch (err) {
-    console.error("Error escaneando:", err.message);
+  } catch (e) {
+    console.error("Error escaneando:", e.message);
   }
 }
 
-// === Bot Telegram control ===
 bot.onText(/\/start/, (msg) => {
   if (msg.chat.id.toString() === CHAT_ID) {
     enviarMenu(CHAT_ID);
@@ -192,7 +185,6 @@ bot.on("callback_query", async (query) => {
   bot.answerCallbackQuery(query.id);
 });
 
-// === Reanudar si estaba encendido ===
 if (leerEstado().activo) {
   intervalo = setInterval(buscarJoyas, 60000);
   buscarJoyas();
