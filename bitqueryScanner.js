@@ -5,17 +5,17 @@ dotenv.config();
 
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN);
 
-export async function escanearBitquery(bot, chatId) {
+export async function escanearBitquery() {
   console.log(`[${new Date().toLocaleTimeString()}] Escaneando en Bitquery...`);
 
-  const query = `
-    {
-      solana(network: solana) {
-        dexTrades(
-          options: {desc: ["tradeAmount"], limit: 20}
-          date: {since: "2025-05-05T00:00:00Z"}
-        ) {
-          market {
+  const query = {
+    query: `
+      {
+        solana {
+          dexTrades(
+            options: {limit: 10, desc: ["tradeAmount"]}
+            date: {since: null, till: null}
+          ) {
             baseCurrency {
               symbol
               address
@@ -23,44 +23,43 @@ export async function escanearBitquery(bot, chatId) {
             quoteCurrency {
               symbol
             }
-            name
+            tradeAmount(in: USD)
+            tradeCount
           }
-          tradeAmount(in: USD)
-          trades: count
         }
       }
-    }
-  `;
+    `
+  };
 
   try {
     const res = await fetch("https://streaming.bitquery.io/graphql", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-API-KEY": process.env.BITQUERY_TOKEN,
+        "X-API-KEY": process.env.BITQUERY_API_KEY
       },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify(query),
     });
 
     const data = await res.json();
-    const tokens = data?.data?.solana?.dexTrades || [];
+    const trades = data?.data?.solana?.dexTrades || [];
 
-    const joyas = tokens.filter((t) => {
-      const amount = t.tradeAmount || 0;
-      const trades = t.trades || 0;
-      return amount > 10000 && trades > 30;
+    const joyas = trades.filter(t => {
+      const vol = t.tradeAmount || 0;
+      return vol > 15000;
     });
 
     if (joyas.length > 0) {
-      joyas.forEach((t) => {
-        const mensaje = `🔵 *Bitquery Detected Gem*\n\n🪙 Token: *${t.market.baseCurrency.symbol}*\n💵 Monto en trades: $${t.tradeAmount.toFixed(2)}\n📊 Trades: ${t.trades}`;
-        console.log(mensaje);
-        bot.sendMessage(chatId, mensaje, { parse_mode: "Markdown" });
+      joyas.forEach(t => {
+        const msg = `🔶 *Bitquery Detected Gem*\n\n🪙 Token: *${t.baseCurrency.symbol}*\n📊 Volumen: $${t.tradeAmount.toFixed(2)}\n🔁 Trades: ${t.tradeCount}`;
+        console.log(msg);
+        bot.sendMessage(process.env.CHAT_ID, msg, { parse_mode: "Markdown" });
       });
     } else {
       console.log(`[${new Date().toLocaleTimeString()}] Sin joyas en Bitquery.`);
     }
-  } catch (e) {
-    console.error("Error escaneando Bitquery:", e.message);
+
+  } catch (error) {
+    console.error("Error escaneando Bitquery:", error.message);
   }
 }
