@@ -8,7 +8,6 @@ import dotenv from "dotenv";
 import fs from "fs";
 import { escanearPumpFun } from "./pumpScanner.js";
 import { escanearBirdeye } from "./birdeyeScanner.js";
-import { escanearBitquery } from "./bitqueryScanner.js";
 
 dotenv.config();
 
@@ -92,7 +91,6 @@ function enviarMenu(chatId) {
 async function escanearTodo() {
   await escanearPumpFun(bot, CHAT_ID);
   await escanearBirdeye(bot, CHAT_ID);
-  await escanearBitquery(bot, CHAT_ID);
 }
 
 bot.onText(/\/start/, (msg) => {
