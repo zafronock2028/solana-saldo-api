@@ -1,15 +1,16 @@
 {
   "name": "zafrobot-joyas-x100",
   "version": "1.0.0",
-  "description": "Bot para detectar gemas en Solana",
+  "description": "ZafroBot Joyas X100 escanea Birdeye y Pump.fun en busca de gemas.",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "dotenv": "^16.3.1",
+    "dotenv": "^16.0.3",
     "express": "^4.18.2",
+    "fs": "^0.0.1-security",
     "node-fetch": "^2.6.9",
     "node-telegram-bot-api": "^0.61.0"
   }
