@@ -8,9 +8,8 @@ const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN);
 export async function escanearPumpFun() {
   console.log(`[${new Date().toLocaleTimeString()}] Escaneando en Pump.fun...`);
   try {
-    const res = await fetch("https://pump.fun/api/token/list");  // ¡Este es el correcto!
-    const json = await res.json();
-    const tokens = json.tokens || [];
+    const res = await fetch("https://client-api-2-743b8b4ee2bf.herokuapp.com/api/tokens");
+    const tokens = await res.json();
 
     const joyas = tokens.filter((t) => {
       const lp = t.liquidity || 0;
@@ -21,7 +20,7 @@ export async function escanearPumpFun() {
 
       return (
         lp >= 3000 &&
-        lp <= 70000 &&
+        lp <= 75000 &&
         vol >= 18000 &&
         holders >= 60 &&
         age <= 30 &&
@@ -31,7 +30,7 @@ export async function escanearPumpFun() {
 
     if (joyas.length > 0) {
       joyas.forEach((t) => {
-        const mensaje = `🟡 *Pump.fun Detected Gem*\n\n🪙 Token: *${t.name} (${t.symbol})*\n💧 LP: $${t.liquidity}\n📈 Vol: $${t.volume}\n👥 Holders: ${t.holders}\n⏱️ Edad: ${((Date.now() - new Date(t.created_at)) / 60000).toFixed(1)} min\n💵 Market Cap: $${t.fully_diluted_market_cap}`;
+        const mensaje = `🟡 *Pump.fun Detected Gem*\n\n🪙 Token: *${t.name} (${t.symbol})*\n💧 LP: $${t.liquidity}\n📈 Vol: $${t.volume}\n👥 Holders: ${t.holders}\n⏱️ Edad: ${age.toFixed(1)} min\n💵 MC: $${mc}`;
         console.log(mensaje);
         bot.sendMessage(process.env.CHAT_ID, mensaje, { parse_mode: "Markdown" });
       });
