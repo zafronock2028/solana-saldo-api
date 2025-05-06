@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// USANDO HELIUS
 const connection = new Connection('https://mainnet.helius-rpc.com/?api-key=3e221462-c157-4c86-b885-dfbc736e2846');
 const provider = new AnchorProvider(connection, {}, {});
 const programId = new PublicKey('PumPpTunA9D49qkZ2TBeCpYTxUN1UbkXHc3i7zALvN2');
@@ -27,16 +26,35 @@ export async function escanearPumpFun(bot, chatId) {
     }
 
     for (const acc of accounts) {
-      const createdAt = (await connection.getParsedAccountInfo(acc.pubkey)).value?.data?.parsed?.info?.createdAt;
-      const currentSlot = await connection.getSlot();
-      const blockTime = await connection.getBlockTime(currentSlot);
-      const edad = createdAt ? (blockTime - createdAt) / 60 : 9999;
+      try {
+        const accountInfo = await connection.getParsedAccountInfo(acc.pubkey);
+        const createdAt = accountInfo.value?.data?.parsed?.info?.createdAt;
+        const currentSlot = await connection.getSlot();
+        const blockTime = await connection.getBlockTime(currentSlot);
+        const edad = createdAt ? (blockTime - createdAt) / 60 : 9999;
 
-      if (edad < 30) {
-        bot.sendMessage(chatId, `🟡 *Pump.fun - Gem Found*\n\nCA: \`${acc.pubkey.toBase58()}\`\nEdad: ${edad.toFixed(2)} min`, { parse_mode: "Markdown" });
+        const marketCap = accountInfo.value?.data?.parsed?.info?.marketCap || 0;
+        const holders = accountInfo.value?.data?.parsed?.info?.holders || 0;
+
+        if (
+          edad > 5 && edad <= 45 &&
+          marketCap >= 8000 && marketCap <= 68000 &&
+          holders >= 50
+        ) {
+          const mensaje = `🔥 *GEMA DETECTADA EN PUMPFUN* 🔥
+
+🪙 Token CA: \`${acc.pubkey.toBase58()}\`
+📈 Market Cap: $${marketCap}
+👥 Holders: ${holders}
+⏱️ Edad: ${edad.toFixed(1)} min`;
+          console.log(mensaje);
+          await bot.sendMessage(chatId, mensaje, { parse_mode: "Markdown" });
+        }
+
+        await delay(300);
+      } catch (e) {
+        console.log("Error analizando token:", e.message);
       }
-
-      await delay(250);
     }
   } catch (err) {
     console.error("Error escaneando Pump.fun:", err.message);
