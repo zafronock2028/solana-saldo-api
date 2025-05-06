@@ -1,46 +1,48 @@
-import fs from "fs";
-import { Connection, PublicKey } from "@solana/web3.js";
-import { Program, AnchorProvider } from "@project-serum/anchor";
-import idl from "./pump.json" assert { type: "json" };
-import dotenv from "dotenv";
+import fs from 'fs';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { Program, AnchorProvider } from '@project-serum/anchor';
+import idl from './pump.json' assert { type: 'json' };
+import dotenv from 'dotenv';
 
 dotenv.config();
 
-// HELIUS RPC
-const connection = new Connection(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`);
+const connection = new Connection('https://mainnet.helius-rpc.com/?api-key=3e221462-c157-4c86-b885-dfbc736e2846');
 const provider = new AnchorProvider(connection, {}, {});
-const programId = new PublicKey("PumPpTunA9D49qkZ2TBeCpYTxUN1UbkXHc3i7zALvN2");
+const programId = new PublicKey('PumPpTunA9D49qkZ2TBeCpYTxUN1UbkXHc3i7zALvN2');
 const program = new Program(idl, programId, provider);
 
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
-// DETECTAR GEMAS FLEXIBLEMENTE
 export async function escanearPumpFun(bot, chatId) {
   try {
-    console.log(`[${new Date().toLocaleTimeString()}] Escaneando Pump.fun...`);
+    console.log(`[${new Date().toLocaleTimeString()}] Escaneando Pump.fun desde blockchain...`);
 
     const accounts = await connection.getProgramAccounts(programId, {
       filters: [{ dataSize: 165 }]
     });
 
-    const currentSlot = await connection.getSlot();
-    const blockTime = await connection.getBlockTime(currentSlot);
+    if (!accounts || accounts.length === 0) {
+      return console.log("No se encontraron tokens.");
+    }
 
     for (const acc of accounts) {
-      const accInfo = await connection.getParsedAccountInfo(acc.pubkey);
-      const createdAt = accInfo.value?.data?.parsed?.info?.createdAt;
+      const info = await connection.getParsedAccountInfo(acc.pubkey);
+      const createdAt = info.value?.data?.parsed?.info?.createdAt;
+      const currentSlot = await connection.getSlot();
+      const blockTime = await connection.getBlockTime(currentSlot);
+
       const edadMinutos = createdAt ? (blockTime - createdAt) / 60 : 9999;
 
-      // FILTRO FLEXIBLE: GEMAS CON MENOS DE 45 MINUTOS
-      if (edadMinutos <= 45) {
+      // FILTRO FLEXIBLE PARA DETECTAR GEMS CREADAS HASTA HACE 120 MINUTOS
+      if (edadMinutos <= 120) {
         bot.sendMessage(chatId, `✨ *Gema Detectada en Pump.fun*\n\nCA: \`${acc.pubkey.toBase58()}\`\nEdad: ${edadMinutos.toFixed(2)} min`, {
           parse_mode: "Markdown"
         });
       }
 
-      await delay(250); // Para evitar rate limit
+      await delay(250);
     }
-  } catch (error) {
-    console.error("Error escaneando Pump.fun:", error.message);
+  } catch (err) {
+    console.error("Error escaneando Pump.fun:", err.message);
   }
 }
