@@ -1,26 +1,27 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { Program, AnchorProvider } from '@coral-xyz/anchor';
-import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Configuración de conexión mejorada
+// Lista de endpoints RPC con prioridad
 const RPC_ENDPOINTS = [
   process.env.HELIUS_API_KEY ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}` : null,
-  'https://api.mainnet-beta.solana.com',
   'https://solana-mainnet.rpc.extrnode.com',
-  'https://ssc-dao.genesysgo.net'
+  'https://api.mainnet-beta.solana.com',
+  'https://ssc-dao.genesysgo.net',
+  'https://rpc.ankr.com/solana'
 ].filter(Boolean);
 
+// Variables de estado
 let currentRpcIndex = 0;
-const connection = new Connection(RPC_ENDPOINTS[currentRpcIndex], {
+let connection = new Connection(RPC_ENDPOINTS[currentRpcIndex], {
   commitment: 'confirmed',
-  disableRetryOnRateLimit: true,
+  disableRetryOnRateLimit: false,
   confirmTransactionInitialTimeout: 60000
 });
 
-// Programa de Pump.fun
+// Configuración del programa
 const PROGRAM_ID = new PublicKey('PumPpTunA9D49qkZ2TBeCpYTxUN1UbkXHc3i7zALvN2');
 const provider = new AnchorProvider(connection, {}, {});
 const program = new Program({
@@ -33,217 +34,150 @@ const program = new Program({
   }
 }, PROGRAM_ID, provider);
 
-// Estrategias de detección
-const DETECTION_METHODS = [
-  'pumpFunTrending',
-  'pumpFunRecent',
-  'onChainScan',
-  'birdeyeTrending'
-];
-
-// Cache de tokens
+// Cache de tokens detectados
 const tokenCache = new Map();
 const CACHE_TTL = 60 * 60 * 1000; // 1 hora
 
 export async function escanearPumpFun(bot, chatId) {
   try {
-    console.log(`[${new Date().toLocaleTimeString()}] Iniciando escaneo...`);
+    console.log(`[${new Date().toLocaleTimeString()}] Iniciando escaneo on-chain...`);
 
-    // Rotar RPC si es necesario
-    await checkRpcConnection();
+    // Verificar y rotar RPC si es necesario
+    await verifyRpcConnection();
 
-    // Probar múltiples métodos de detección
-    for (const method of DETECTION_METHODS) {
-      try {
-        const tokens = await detectTokens(method);
-        if (tokens.length > 0) {
-          await processAndNotify(tokens, bot, chatId);
-          cleanCache();
-          return;
-        }
-      } catch (error) {
-        console.error(`Error con método ${method}:`, error.message);
-      }
+    // Obtener cuentas del programa
+    const accounts = await getProgramAccountsWithRetry();
+
+    if (!accounts || accounts.length === 0) {
+      console.log("No se encontraron cuentas en el programa.");
+      return;
     }
 
-    console.log("No se encontraron tokens nuevos con ningún método.");
-  } catch (error) {
-    console.error("Error general en escaneo:", error);
-    rotateRpcEndpoint();
-  }
-}
+    // Procesar cuentas
+    const newTokens = await processAccounts(accounts);
 
-// Métodos de detección
-async function detectTokens(method) {
-  switch (method) {
-    case 'pumpFunTrending':
-      return fetchPumpFunTrending();
-    case 'pumpFunRecent':
-      return fetchPumpFunRecent();
-    case 'onChainScan':
-      return fetchOnChainTokens();
-    case 'birdeyeTrending':
-      return fetchBirdeyeTrending();
-    default:
-      return [];
-  }
-}
-
-async function fetchPumpFunTrending() {
-  try {
-    const response = await fetch('https://api.pump.fun/trending', {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      timeout: 8000
-    });
-    
-    if (!response.ok) throw new Error(`Status: ${response.status}`);
-    
-    const data = await response.json();
-    return data.map(t => ({
-      address: t.mint,
-      name: t.name,
-      symbol: t.symbol,
-      age: (Date.now() - new Date(t.createdAt).getTime()) / 60000,
-      liquidity: t.liquidity,
-      holders: t.holders,
-      source: 'Pump.fun Trending'
-    }));
-  } catch (error) {
-    console.error("Error en Pump.fun Trending:", error.message);
-    return [];
-  }
-}
-
-async function fetchPumpFunRecent() {
-  try {
-    const response = await fetch('https://api.pump.fun/recent', {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      timeout: 8000
-    });
-    
-    if (!response.ok) throw new Error(`Status: ${response.status}`);
-    
-    const data = await response.json();
-    return data.map(t => ({
-      address: t.mint,
-      name: t.name,
-      symbol: t.symbol,
-      age: (Date.now() - new Date(t.createdAt).getTime()) / 60000,
-      liquidity: t.liquidity,
-      holders: t.holders,
-      source: 'Pump.fun Recent'
-    }));
-  } catch (error) {
-    console.error("Error en Pump.fun Recent:", error.message);
-    return [];
-  }
-}
-
-async function fetchOnChainTokens() {
-  try {
-    const accounts = await connection.getProgramAccounts(PROGRAM_ID, {
-      filters: [
-        { dataSize: 324 },
-        { memcmp: { offset: 0, bytes: '3' } }
-      ],
-      commitment: 'confirmed'
-    });
-
-    const currentSlot = await connection.getSlot();
-    const currentBlockTime = await connection.getBlockTime(currentSlot);
-
-    const tokens = [];
-    for (const account of accounts.slice(0, 50)) {
-      try {
-        const info = await connection.getParsedAccountInfo(account.pubkey);
-        const createdAt = info.value?.data?.parsed?.info?.createdAt;
-        const age = createdAt ? (currentBlockTime - createdAt) / 60 : 999;
-
-        if (age < 30) { // Tokens menores a 30 minutos
-          tokens.push({
-            address: account.pubkey.toString(),
-            name: info.value?.data?.parsed?.info?.name || 'Unknown',
-            symbol: info.value?.data?.parsed?.info?.symbol || '?',
-            age: age,
-            source: 'On-chain Scan'
-          });
-        }
-      } catch (error) {
-        console.error(`Error procesando cuenta ${account.pubkey}:`, error);
-      }
-      await delay(200);
+    if (newTokens.length > 0) {
+      await notifyTokens(newTokens, bot, chatId);
+    } else {
+      console.log("No se encontraron tokens nuevos.");
     }
-    return tokens;
+
+    // Limpiar cache
+    cleanCache();
+
   } catch (error) {
-    console.error("Error en escaneo on-chain:", error);
-    rotateRpcEndpoint();
-    return [];
+    console.error("Error en escaneo:", error);
+    await rotateRpcEndpoint();
   }
 }
 
-async function fetchBirdeyeTrending() {
-  try {
-    const response = await fetch('https://public-api.birdeye.so/public/trending?time_range=1h', {
-      headers: { 'X-API-KEY': process.env.BIRDEYE_API_KEY || '' },
-      timeout: 8000
-    });
-    
-    if (!response.ok) throw new Error(`Status: ${response.status}`);
-    
-    const data = await response.json();
-    return data.data?.map(t => ({
-      address: t.address,
-      name: t.name,
-      symbol: t.symbol,
-      age: 0, // Birdeye no proporciona timestamp de creación
-      liquidity: t.liquidity?.value,
-      holders: t.holders,
-      source: 'Birdeye Trending'
-    })) || [];
-  } catch (error) {
-    console.error("Error en Birdeye Trending:", error.message);
-    return [];
+// Función mejorada para obtener cuentas con reintentos
+async function getProgramAccountsWithRetry(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const accounts = await connection.getProgramAccounts(PROGRAM_ID, {
+        filters: [
+          { dataSize: 324 }, // Tamaño estándar para cuentas de tokens
+          { memcmp: { offset: 0, bytes: '3' } } // Filtro para tokens
+        ],
+        commitment: 'confirmed'
+      });
+      return accounts;
+    } catch (error) {
+      console.error(`Intento ${i + 1} fallido:`, error.message);
+      if (i < retries - 1) {
+        await rotateRpcEndpoint();
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+  }
+  return [];
+}
+
+// Procesar cuentas encontradas
+async function processAccounts(accounts) {
+  const currentSlot = await connection.getSlot();
+  const currentBlockTime = await connection.getBlockTime(currentSlot);
+  const newTokens = [];
+
+  for (const account of accounts.slice(0, 100)) { // Limitar a 100 para no saturar
+    try {
+      const tokenAddress = account.pubkey.toString();
+      
+      // Saltar si ya está en cache
+      if (tokenCache.has(tokenAddress)) continue;
+
+      const accountInfo = await connection.getParsedAccountInfo(account.pubkey);
+      const parsedData = accountInfo.value?.data?.parsed?.info;
+      
+      if (!parsedData) continue;
+
+      const createdAt = parsedData.createdAt;
+      const tokenAge = createdAt ? (currentBlockTime - createdAt) / 60 : 999; // Edad en minutos
+
+      if (tokenAge < 15) { // Solo tokens menores a 15 minutos
+        newTokens.push({
+          address: tokenAddress,
+          age: tokenAge,
+          name: parsedData.name || 'Unknown',
+          symbol: parsedData.symbol || '?',
+          source: 'On-chain Scan'
+        });
+      }
+    } catch (error) {
+      console.error(`Error procesando cuenta:`, error);
+    }
+    await new Promise(resolve => setTimeout(resolve, 200)); // Delay entre peticiones
+  }
+
+  return newTokens;
+}
+
+// Notificar tokens encontrados
+async function notifyTokens(tokens, bot, chatId) {
+  for (const token of tokens) {
+    try {
+      const message = `🚀 *NUEVO TOKEN DETECTADO* 🚀\n\n` +
+                     `🔹 *Nombre:* ${token.name}\n` +
+                     `🔹 *Símbolo:* ${token.symbol}\n` +
+                     `🔹 *CA:* \`${token.address}\`\n` +
+                     `🔹 *Edad:* ${token.age.toFixed(2)} minutos\n\n` +
+                     `[🔗 Pump.fun](https://pump.fun/${token.address}) | ` +
+                     `[📊 DexScreener](https://dexscreener.com/solana/${token.address})`;
+      
+      await bot.sendMessage(chatId, message, {
+        parse_mode: "Markdown",
+        disable_web_page_preview: true
+      });
+      
+      tokenCache.set(token.address, Date.now());
+      console.log(`Token detectado: ${token.address}`);
+      
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limit
+    } catch (error) {
+      console.error(`Error notificando token ${token.address}:`, error);
+    }
   }
 }
 
 // Helpers
-async function processAndNotify(tokens, bot, chatId) {
-  for (const token of tokens) {
-    if (!isTokenCached(token.address) && token.age < 30) {
-      try {
-        const message = buildTokenMessage(token);
-        await bot.sendMessage(chatId, message, {
-          parse_mode: "Markdown",
-          disable_web_page_preview: true
-        });
-        cacheToken(token.address);
-        console.log(`Token detectado (${token.source}): ${token.address}`);
-      } catch (error) {
-        console.error(`Error notificando token ${token.address}:`, error);
-      }
-      await delay(1000);
-    }
+async function verifyRpcConnection() {
+  try {
+    await connection.getEpochInfo();
+  } catch (error) {
+    console.error("Error de conexión RPC, rotando endpoint...");
+    await rotateRpcEndpoint();
   }
 }
 
-function buildTokenMessage(token) {
-  return `🚀 *NUEVO TOKEN DETECTADO* (${token.source}) 🚀\n\n` +
-         `🔹 *Nombre:* ${token.name}\n` +
-         `🔹 *Símbolo:* ${token.symbol}\n` +
-         `🔹 *CA:* \`${token.address}\`\n` +
-         `🔹 *Edad:* ${token.age ? token.age.toFixed(2) + ' minutos' : 'Reciente'}\n` +
-         `🔹 *Liquidez:* ${token.liquidity ? `${token.liquidity} SOL` : 'No disponible'}\n` +
-         `🔹 *Holders:* ${token.holders || 'No disponible'}\n\n` +
-         `[🔗 Pump.fun](https://pump.fun/${token.address}) | ` +
-         `[📊 DexScreener](https://dexscreener.com/solana/${token.address})`;
-}
-
-function isTokenCached(address) {
-  return tokenCache.has(address);
-}
-
-function cacheToken(address) {
-  tokenCache.set(address, Date.now());
+async function rotateRpcEndpoint() {
+  currentRpcIndex = (currentRpcIndex + 1) % RPC_ENDPOINTS.length;
+  connection = new Connection(RPC_ENDPOINTS[currentRpcIndex], {
+    commitment: 'confirmed',
+    disableRetryOnRateLimit: false,
+    confirmTransactionInitialTimeout: 60000
+  });
+  console.log(`RPC cambiado a: ${RPC_ENDPOINTS[currentRpcIndex]}`);
 }
 
 function cleanCache() {
@@ -253,23 +187,4 @@ function cleanCache() {
       tokenCache.delete(address);
     }
   }
-}
-
-async function checkRpcConnection() {
-  try {
-    await connection.getSlot();
-  } catch (error) {
-    console.error("Error con RPC actual, rotando...");
-    rotateRpcEndpoint();
-  }
-}
-
-function rotateRpcEndpoint() {
-  currentRpcIndex = (currentRpcIndex + 1) % RPC_ENDPOINTS.length;
-  connection._rpcEndpoint = RPC_ENDPOINTS[currentRpcIndex];
-  console.log(`RPC cambiado a: ${RPC_ENDPOINTS[currentRpcIndex]}`);
-}
-
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
