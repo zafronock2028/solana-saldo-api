@@ -6,8 +6,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// RPC ESTABLE (evita error 410)
-const connection = new Connection('https://rpc-proxy.triton.one');
+// USANDO HELIUS
+const connection = new Connection('https://mainnet.helius-rpc.com/?api-key=3e221462-c157-4c86-b885-dfbc736e2846');
 const provider = new AnchorProvider(connection, {}, {});
 const programId = new PublicKey('PumPpTunA9D49qkZ2TBeCpYTxUN1UbkXHc3i7zALvN2');
 const program = new Program(idl, programId, provider);
