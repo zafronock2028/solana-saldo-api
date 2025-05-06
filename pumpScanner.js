@@ -1,4 +1,3 @@
-import fs from 'fs';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { Program, AnchorProvider } from '@project-serum/anchor';
 import idl from './pump.json' assert { type: 'json' };
@@ -6,7 +5,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const connection = new Connection('https://mainnet.helius-rpc.com/?api-key=3e221462-c157-4c86-b885-dfbc736e2846');
+const connection = new Connection(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`);
 const provider = new AnchorProvider(connection, {}, {});
 const programId = new PublicKey('PumPpTunA9D49qkZ2TBeCpYTxUN1UbkXHc3i7zALvN2');
 const program = new Program(idl, programId, provider);
@@ -26,35 +25,21 @@ export async function escanearPumpFun(bot, chatId) {
     }
 
     for (const acc of accounts) {
-      try {
-        const accountInfo = await connection.getParsedAccountInfo(acc.pubkey);
-        const createdAt = accountInfo.value?.data?.parsed?.info?.createdAt;
-        const currentSlot = await connection.getSlot();
-        const blockTime = await connection.getBlockTime(currentSlot);
-        const edad = createdAt ? (blockTime - createdAt) / 60 : 9999;
+      const parsed = await connection.getParsedAccountInfo(acc.pubkey);
+      const createdAt = parsed.value?.data?.parsed?.info?.createdAt;
 
-        const marketCap = accountInfo.value?.data?.parsed?.info?.marketCap || 0;
-        const holders = accountInfo.value?.data?.parsed?.info?.holders || 0;
+      const currentSlot = await connection.getSlot();
+      const blockTime = await connection.getBlockTime(currentSlot);
 
-        if (
-          edad > 5 && edad <= 45 &&
-          marketCap >= 8000 && marketCap <= 68000 &&
-          holders >= 50
-        ) {
-          const mensaje = `🔥 *GEMA DETECTADA EN PUMPFUN* 🔥
+      const edad = createdAt ? (blockTime - createdAt) / 60 : 9999;
 
-🪙 Token CA: \`${acc.pubkey.toBase58()}\`
-📈 Market Cap: $${marketCap}
-👥 Holders: ${holders}
-⏱️ Edad: ${edad.toFixed(1)} min`;
-          console.log(mensaje);
-          await bot.sendMessage(chatId, mensaje, { parse_mode: "Markdown" });
-        }
-
-        await delay(300);
-      } catch (e) {
-        console.log("Error analizando token:", e.message);
+      if (edad <= 45) {
+        const mensaje = `🔍 *Token Detectado (Modo Prueba)*\n\nCA: \`${acc.pubkey.toBase58()}\`\nEdad: ${edad.toFixed(2)} min`;
+        console.log(mensaje);
+        await bot.sendMessage(chatId, mensaje, { parse_mode: "Markdown" });
       }
+
+      await delay(300);
     }
   } catch (err) {
     console.error("Error escaneando Pump.fun:", err.message);
