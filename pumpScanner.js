@@ -4,11 +4,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Configuración actualizada con el nuevo programa de Pump.fun
+// Configuración actualizada
 const PUMP_FUN_PROGRAM_ID = new PublicKey('6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P');
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
-// Endpoints RPC prioritarios
+// Endpoints RPC con prioridad
 const RPC_ENDPOINTS = [
   process.env.HELIUS_API_KEY ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}` : null,
   'https://api.mainnet-beta.solana.com',
@@ -23,7 +23,7 @@ const connection = new Connection(RPC_ENDPOINTS[currentRpcIndex], {
   confirmTransactionInitialTimeout: 60000
 });
 
-// Cache de tokens detectados
+// Cache mejorada
 const tokenCache = new Map();
 const CACHE_TTL = 60 * 60 * 1000; // 1 hora
 
@@ -31,39 +31,39 @@ export async function escanearPumpFun(bot, chatId) {
   try {
     console.log(`[${new Date().toLocaleTimeString()}] Iniciando escaneo avanzado...`);
 
-    // 1. Obtener transacciones recientes del programa
-    const recentSignatures = await connection.getSignaturesForAddress(PUMP_FUN_PROGRAM_ID, {
-      limit: 50,
+    // 1. Obtener firmas recientes del programa Pump.fun
+    const signatures = await connection.getSignaturesForAddress(PUMP_FUN_PROGRAM_ID, {
+      limit: 30, // Reducido para mayor eficiencia
       commitment: 'confirmed'
     });
 
-    if (!recentSignatures || recentSignatures.length === 0) {
+    if (!signatures || signatures.length === 0) {
       console.log("No se encontraron transacciones recientes.");
       return;
     }
 
-    // 2. Procesar transacciones para encontrar nuevos tokens
+    // 2. Procesar transacciones para encontrar tokens nuevos
     const newTokens = [];
     
-    for (const signature of recentSignatures) {
+    for (const signature of signatures) {
       try {
-        const tx = await connection.getParsedTransaction(signature.signature, {
+        const tx = await connection.getTransaction(signature.signature, {
           commitment: 'confirmed',
           maxSupportedTransactionVersion: 0
         });
 
         if (!tx || !tx.meta || tx.meta.err) continue;
 
-        // Buscar creación de cuentas en la transacción
-        const createdAccounts = tx.transaction.message.instructions
-          .flatMap(ix => ix.accounts)
-          .map(accountIndex => tx.transaction.message.accountKeys[accountIndex].pubkey.toString());
+        // Buscar cuentas creadas en la transacción
+        const createdAccounts = tx.transaction.message.staticAccountKeys
+          .filter((_, index) => tx.meta?.createdAccounts?.includes(index))
+          .map(account => account.toString());
 
-        // Buscar tokens nuevos
+        // Filtrar y procesar cuentas nuevas
         for (const account of createdAccounts) {
           if (!tokenCache.has(account)) {
             const accountInfo = await connection.getParsedAccountInfo(new PublicKey(account));
-            if (accountInfo.value && accountInfo.value.data.space === 165) { // Tamaño de cuenta de token
+            if (accountInfo.value?.data?.space === 165) { // Tamaño estándar de cuenta de token
               newTokens.push({
                 address: account,
                 timestamp: new Date(signature.blockTime * 1000),
@@ -75,10 +75,10 @@ export async function escanearPumpFun(bot, chatId) {
       } catch (error) {
         console.error(`Error procesando transacción ${signature.signature}:`, error.message);
       }
-      await new Promise(resolve => setTimeout(resolve, 500)); // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 300)); // Rate limiting
     }
 
-    // 3. Notificar tokens encontrados
+    // 3. Notificar tokens nuevos
     if (newTokens.length > 0) {
       await processAndNotifyTokens(newTokens, bot, chatId);
     } else {
@@ -94,7 +94,7 @@ export async function escanearPumpFun(bot, chatId) {
   }
 }
 
-// Procesar y notificar tokens encontrados
+// Procesar y notificar tokens
 async function processAndNotifyTokens(tokens, bot, chatId) {
   const now = Date.now();
   
@@ -124,21 +124,21 @@ async function processAndNotifyTokens(tokens, bot, chatId) {
     } catch (error) {
       console.error(`Error procesando token ${token.address}:`, error);
     }
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limiting
+    await new Promise(resolve => setTimeout(resolve, 800)); // Rate limiting
   }
 }
 
 // Obtener metadatos del token
 async function getTokenMetadata(tokenAddress) {
   try {
-    const metadataPDA = PublicKey.findProgramAddressSync(
+    const [metadataPDA] = PublicKey.findProgramAddressSync(
       [
         Buffer.from('metadata'),
         TOKEN_METADATA_PROGRAM_ID.toBuffer(),
         new PublicKey(tokenAddress).toBuffer()
       ],
       TOKEN_METADATA_PROGRAM_ID
-    )[0];
+    );
 
     const metadataAccount = await connection.getAccountInfo(metadataPDA);
     if (metadataAccount) {
@@ -154,13 +154,12 @@ async function getTokenMetadata(tokenAddress) {
   return {};
 }
 
-// Función para decodificar metadatos
+// Decodificador básico de metadatos
 function decodeTokenMetadata(buffer) {
-  // Implementación básica de decodificación
-  const nameLength = buffer.slice(1, 5).readUInt32LE(0);
-  const name = buffer.slice(5, 5 + nameLength).toString();
-  const symbolLength = buffer.slice(5 + nameLength, 5 + nameLength + 5).readUInt32LE(0);
-  const symbol = buffer.slice(5 + nameLength + 5, 5 + nameLength + 5 + symbolLength).toString();
+  const nameLength = buffer[33];
+  const name = buffer.slice(34, 34 + nameLength).toString();
+  const symbolLength = buffer[34 + nameLength + 1];
+  const symbol = buffer.slice(34 + nameLength + 2, 34 + nameLength + 2 + symbolLength).toString();
   
   return {
     data: {
