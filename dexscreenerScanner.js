@@ -1,3 +1,4 @@
+// dexscreenerScanner.js
 import fetch from "node-fetch";
 
 export async function escanearDexScreener(bot, chatId) {
@@ -16,7 +17,7 @@ export async function escanearDexScreener(bot, chatId) {
 
       if (
         vol < 1000000 &&
-        ageMin <= 4320 && // 3 días
+        ageMin <= 4320 && // <= 3 días
         holders >= 5000 &&
         lp >= 3000 &&
         mc >= 100000 && mc <= 1500000
