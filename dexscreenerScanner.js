@@ -25,6 +25,7 @@ export async function escanearDexScreener(bot, chatId) {
     });
 
     for (const t of joyas) {
+      const ageMin = (Date.now() - new Date(t.pairCreatedAt).getTime()) / 60000;
       const mensaje = `🟣 *DexScreener Gem Found*\n\n🪙 Token: *${t.baseToken.name} (${t.baseToken.symbol})*\n💧 LP: $${t.liquidity?.usd}\n📈 Vol: $${t.volume.h24}\n📅 Edad: ${(ageMin / 60).toFixed(1)} h\n💵 MC: $${t.fdv}`;
       console.log(mensaje);
       await bot.sendMessage(chatId, mensaje, { parse_mode: "Markdown" });
