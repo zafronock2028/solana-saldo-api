@@ -68,7 +68,7 @@ function guardarEstado(nuevo) {
 }
 
 function enviarMenu(chatId) {
-  bot.sendMessage(chatId, "Panel de control ZafroBot Joyas X100", {
+  bot.sendMessage(chatId, "Panel de control ZafroBot Joyas X100 (solo Pump.fun)", {
     reply_markup: {
       inline_keyboard: [
         [
@@ -76,11 +76,7 @@ function enviarMenu(chatId) {
           { text: "🛑 Apagar Bot", callback_data: "off" },
         ],
         [{ text: "📊 Estado", callback_data: "estado" }],
-        [{ text: "💰 Saldo", callback_data: "saldo" }],
-        [
-          { text: "📈 Operación Activa", callback_data: "op" },
-          { text: "📂 Historial", callback_data: "historial" },
-        ],
+        [{ text: "💰 Saldo", callback_data: "saldo" }]
       ],
     },
   });
@@ -105,7 +101,7 @@ bot.on("callback_query", async (query) => {
     guardarEstado({ activo: true });
     intervalo = setInterval(escanearTodo, 30000);
     escanearTodo();
-    bot.sendMessage(CHAT_ID, "ZafroBot está ENCENDIDO.");
+    bot.sendMessage(CHAT_ID, "ZafroBot está ENCENDIDO y escaneando Pump.fun.");
   }
 
   if (data === "off") {
@@ -138,14 +134,6 @@ bot.on("callback_query", async (query) => {
     } catch (e) {
       bot.sendMessage(CHAT_ID, "Error consultando saldo.");
     }
-  }
-
-  if (data === "op") {
-    bot.sendMessage(CHAT_ID, "No hay operación activa.");
-  }
-
-  if (data === "historial") {
-    bot.sendMessage(CHAT_ID, "Historial vacío (aún no se guarda).");
   }
 
   bot.answerCallbackQuery(query.id);
