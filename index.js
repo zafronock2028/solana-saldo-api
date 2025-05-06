@@ -52,7 +52,6 @@ app.listen(PORT, () => {
   console.log(`Servidor activo en el puerto ${PORT}`);
 });
 
-// Control de estado
 const estadoPath = "./estado_bot.json";
 let intervalo = null;
 
@@ -91,7 +90,6 @@ async function escanearTodo() {
   await escanearPumpFun(bot, CHAT_ID);
 }
 
-// Comandos de Telegram
 bot.onText(/\/start/, (msg) => {
   if (msg.chat.id.toString() === CHAT_ID) {
     enviarMenu(CHAT_ID);
@@ -153,7 +151,6 @@ bot.on("callback_query", async (query) => {
   bot.answerCallbackQuery(query.id);
 });
 
-// Autoarranque si estaba encendido
 if (leerEstado().activo) {
   intervalo = setInterval(escanearTodo, 30000);
   escanearTodo();
