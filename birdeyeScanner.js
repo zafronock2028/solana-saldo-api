@@ -1,6 +1,7 @@
+// birdeyeScanner.js
 import fetch from "node-fetch";
-import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
+import TelegramBot from "node-telegram-bot-api";
 dotenv.config();
 
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN);
@@ -20,16 +21,22 @@ export const escanearBirdeye = async (bot, chatId) => {
 
       return (
         lp >= 3000 &&
-        lp <= 75000 &&
-        vol >= 18000 &&
+        lp <= 80000 &&
+        vol >= 20000 &&
         vol / lp >= 3 &&
         age <= 45 &&
-        mc >= 100000 && mc <= 1500000
+        mc >= 70000 &&
+        mc <= 1200000
       );
     });
 
     for (const t of joyas) {
-      const mensaje = `🟢 *Birdeye Detected Gem*\n\n🪙 Token: *${t.name} (${t.symbol})*\n💧 LP: $${t.liquidity}\n📈 Vol: $${t.volume_24h}\n⏱️ Edad: ${t.age_minutes} min\n💵 MC: $${t.market_cap_usd}`;
+      const mensaje = `🟢 *Birdeye - Gema Detectada*\n\n` +
+        `🪙 Token: *${t.name} (${t.symbol})*\n` +
+        `💧 LP: $${t.liquidity}\n` +
+        `📈 Volumen 24h: $${t.volume_24h}\n` +
+        `🕒 Edad: ${t.age_minutes} min\n` +
+        `💵 Market Cap: $${t.market_cap_usd}`;
       console.log(mensaje);
       await bot.sendMessage(chatId, mensaje, { parse_mode: "Markdown" });
     }
