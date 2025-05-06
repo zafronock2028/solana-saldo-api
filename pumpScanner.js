@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Conexión con Helius
 const connection = new Connection('https://mainnet.helius-rpc.com/?api-key=3e221462-c157-4c86-b885-dfbc736e2846');
 const provider = new AnchorProvider(connection, {}, {});
 const programId = new PublicKey('PumPpTunA9D49qkZ2TBeCpYTxUN1UbkXHc3i7zALvN2');
@@ -18,26 +19,31 @@ export async function escanearPumpFun(bot, chatId) {
     console.log(`[${new Date().toLocaleTimeString()}] Escaneando Pump.fun desde blockchain...`);
 
     const accounts = await connection.getProgramAccounts(programId, {
-      filters: [{ dataSize: 165 }]
+      filters: [{ dataSize: 165 }],
     });
 
+    console.log(`Cuentas encontradas: ${accounts.length}`);
+
     if (!accounts || accounts.length === 0) {
-      return console.log("No se encontraron tokens.");
+      console.log("No se encontraron tokens.");
+      return;
     }
 
+    const currentSlot = await connection.getSlot();
+    const blockTime = await connection.getBlockTime(currentSlot);
+
     for (const acc of accounts) {
-      const info = await connection.getParsedAccountInfo(acc.pubkey);
-      const createdAt = info.value?.data?.parsed?.info?.createdAt;
-      const currentSlot = await connection.getSlot();
-      const blockTime = await connection.getBlockTime(currentSlot);
+      const parsedInfo = (await connection.getParsedAccountInfo(acc.pubkey)).value;
 
-      const edadMinutos = createdAt ? (blockTime - createdAt) / 60 : 9999;
+      const createdAt = parsedInfo?.data?.parsed?.info?.createdAt;
+      console.log(`Token: ${acc.pubkey.toBase58()} | createdAt: ${createdAt}`);
 
-      // FILTRO FLEXIBLE PARA DETECTAR GEMS CREADAS HASTA HACE 120 MINUTOS
-      if (edadMinutos <= 120) {
-        bot.sendMessage(chatId, `✨ *Gema Detectada en Pump.fun*\n\nCA: \`${acc.pubkey.toBase58()}\`\nEdad: ${edadMinutos.toFixed(2)} min`, {
-          parse_mode: "Markdown"
-        });
+      const edad = createdAt ? (blockTime - createdAt) / 60 : 9999;
+
+      // Filtro temporal relajado para probar que sí funciona
+      if (edad < 3000) {
+        const msg = `🟡 *Pump.fun - Gem Found*\n\nCA: \`${acc.pubkey.toBase58()}\`\nEdad: ${edad.toFixed(2)} min`;
+        bot.sendMessage(chatId, msg, { parse_mode: "Markdown" });
       }
 
       await delay(250);
