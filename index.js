@@ -6,7 +6,6 @@ import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
 import fs from "fs";
 import { escanearPumpFun } from "./pumpScanner.js";
-import { escanearDexScreener } from "./dexscreenerScanner.js";
 
 dotenv.config();
 
@@ -53,6 +52,7 @@ app.listen(PORT, () => {
   console.log(`Servidor activo en el puerto ${PORT}`);
 });
 
+// Control de estado
 const estadoPath = "./estado_bot.json";
 let intervalo = null;
 
@@ -89,9 +89,9 @@ function enviarMenu(chatId) {
 
 async function escanearTodo() {
   await escanearPumpFun(bot, CHAT_ID);
-  await escanearDexScreener(bot, CHAT_ID);
 }
 
+// Comandos de Telegram
 bot.onText(/\/start/, (msg) => {
   if (msg.chat.id.toString() === CHAT_ID) {
     enviarMenu(CHAT_ID);
@@ -153,6 +153,7 @@ bot.on("callback_query", async (query) => {
   bot.answerCallbackQuery(query.id);
 });
 
+// Autoarranque si estaba encendido
 if (leerEstado().activo) {
   intervalo = setInterval(escanearTodo, 30000);
   escanearTodo();
