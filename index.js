@@ -6,7 +6,7 @@ import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
 import fs from "fs";
 import { escanearPumpFun } from "./pumpScanner.js";
-import { escanearBirdeye } from "./birdeyeScanner.js";
+import { escanearDexScreener } from "./dexscreenerScanner.js";
 
 dotenv.config();
 
@@ -89,7 +89,7 @@ function enviarMenu(chatId) {
 
 async function escanearTodo() {
   await escanearPumpFun(bot, CHAT_ID);
-  await escanearBirdeye(bot, CHAT_ID);
+  await escanearDexScreener(bot, CHAT_ID);
 }
 
 bot.onText(/\/start/, (msg) => {
